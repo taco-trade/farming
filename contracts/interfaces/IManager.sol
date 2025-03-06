@@ -13,6 +13,7 @@ interface IManager {
         uint24 fee,
         bool allowed
     );
+    event Collect(address indexed user, address token, address recipient);
 
     function setPoolWhiteList(
         address token0,
@@ -35,4 +36,6 @@ interface IManager {
         uint24 fee,
         bool allowed
     ) external;
+
+    function collect(address token, address recipient) external;
 }

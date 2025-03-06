@@ -40,4 +40,7 @@ interface IUserVault is IERC721Receiver {
         bytes32 poolKey,
         bool allowed
     ) external;
+
+    /// @notice Collect tokens in this contract
+    function collect(address token, address recipient) external;
 }

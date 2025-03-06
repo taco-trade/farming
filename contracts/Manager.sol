@@ -70,10 +70,8 @@ contract Manager is IManager, Ownable {
         );
     }
 
-    /**
-     * @notice Allows a user to set their agent address in the manager
-     * @param newAgent New agent address
-     */
+     /// @notice Allows a user to set their agent address in the manager
+     /// @param newAgent New agent address
     function setAgent(address newAgent) external {
         address vaultAddr = userVaults[msg.sender];
         if (vaultAddr == address(0)) revert NoVault();
@@ -93,6 +91,14 @@ contract Manager is IManager, Ownable {
         if (!poolWhiteList[key]) revert PoolNotInGlobalWhitelist();
 
         UserVault(vaultAddr).updateAgentAllowedPool(msg.sender, key, allowed);
+    }
+
+    /// @notice Collect tokens in this contract
+    function collect(address token, address recipient) external {
+        address vaultAddr = userVaults[msg.sender];
+        if (vaultAddr == address(0)) revert NoVault();
+        UserVault(vaultAddr).collect(token, recipient);
+        emit Collect(msg.sender, token, recipient);
     }
 
     /// @dev Internal function to create a UserVault for a user

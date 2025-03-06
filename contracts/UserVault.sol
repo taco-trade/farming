@@ -127,6 +127,11 @@ contract UserVault is IUserVault {
         emit UpdateAgentPool(poolKey, allowed);
     }
 
+    /// @notice Collect tokens in this contract
+    function collect(address token, address recipient) external onlyManager {
+        SafeERC20.safeTransfer(IERC20(token), recipient, IERC20(token).balanceOf(address(this)));
+    }
+
     // ---------------- only strategy in exec scope can call functions ----------------- //
 
     function requestFunds(
