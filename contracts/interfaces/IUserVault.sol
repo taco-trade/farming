@@ -7,7 +7,8 @@ import "./INonfungiblePositionManager.sol";
 
 struct Position {
     // position NFT token ID
-    uint256 tokenID;
+    uint8 posType;
+    bytes data;
 }
 
 interface IUserVault is IERC721Receiver {
@@ -22,7 +23,7 @@ interface IUserVault is IERC721Receiver {
     function agent() external view returns (address);
     function agentPoolAllowList(bytes32) external view returns (bool);
     function nftPositionManager() external view returns (INonfungiblePositionManager);
-    function positionTokenId(uint256) external view returns (uint256);
+    function positions(uint256) external view returns (Position memory);
 
     // State-Changing Functions
     function work(
