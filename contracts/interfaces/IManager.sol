@@ -15,6 +15,8 @@ interface IManager {
     );
     event Collect(address indexed user, address token, address recipient);
 
+    function createUserVault() external;
+
     function setPoolWhiteList(
         address token0,
         address token1,

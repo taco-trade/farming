@@ -43,4 +43,14 @@ interface IUserVault is IERC721Receiver {
 
     /// @notice Collect tokens in this contract
     function collect(address token, address recipient) external;
+
+    function requestFundsFromUser(
+        address token,
+        uint256 amount
+    ) external;
+
+    function requestFunds(
+        address token,
+        uint256 amount
+    ) external;
 }

@@ -58,6 +58,10 @@ contract UserVault is IUserVault {
         manager = _manager;
         nftPositionManager = INonfungiblePositionManager(_nftPositionManager);
         nextPositionId = 1;
+
+        _IN_EXEC_LOCK = _NOT_ENTERED;
+        POSITION_ID = _NO_ID;
+        STRATEGY = _NO_ADDRESS;
     }
 
     /// @notice agent address is publicly readable

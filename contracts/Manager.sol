@@ -10,7 +10,7 @@ contract Manager is IManager, Ownable {
     error NotUserNorAgent();
     error NoVault();
     error PoolNotInGlobalWhitelist();
-
+    error VaultAlreadyExists();
     /// state variables
     address public immutable nftPositionManager;
 
@@ -40,9 +40,15 @@ contract Manager is IManager, Ownable {
         emit UpdatePoolWhiteList(token0, token1, fee, allowed);
     }
 
+    function createUserVault() external {
+        if (userVaults[msg.sender] != address(0)) revert VaultAlreadyExists();
+        address vaultAddr = _createUserVault(msg.sender);
+        userVaults[msg.sender] = vaultAddr;
+    }
+
     /// @notice Executes unified operations on a pool position for a user;
     /// all logic is encapsulated in the `strategy` contract and `data`
-    /// @dev `msg.sender` can be either the user themselves or their agent
+    /// @dev `msg.sender` can be either the user themselves or the vault's agent
     /// @param _positionID The ID of the position to work on
     /// @param _strategy Strategy contract address
     /// @param _data     Custom data passed to the strategy
@@ -53,7 +59,7 @@ contract Manager is IManager, Ownable {
     ) external {
         address vaultAddr = userVaults[msg.sender];
         if (vaultAddr == address(0)) {
-            vaultAddr = _createUserVault(msg.sender);
+            revert NoVault();
         }
 
         // 1. Check if the caller is the user themselves or the vault's agent

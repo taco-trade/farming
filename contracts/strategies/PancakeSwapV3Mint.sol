@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {INonfungiblePositionManager, MintParams} from "../interfaces/INonfungiblePositionManager.sol";
 import {IStrategy} from "../interfaces/IStrategy.sol";
+import {IUserVault} from "../interfaces/IUserVault.sol";
 
 contract PancakeSwapV3Mint is IStrategy, IERC721Receiver {
     address public factory;
@@ -33,6 +34,9 @@ contract PancakeSwapV3Mint is IStrategy, IERC721Receiver {
             positionManager,
             params.amount1Desired
         );
+
+        IUserVault(msg.sender).requestFundsFromUser(params.token0, params.amount0Desired);
+        IUserVault(msg.sender).requestFundsFromUser(params.token1, params.amount1Desired);
 
         params.recipient = msg.sender;
         params.deadline = block.timestamp;
