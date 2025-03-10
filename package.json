@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "scripts:bsc-test:mint": "pnpm exec hardhat run scripts/mint.ts --network bscTestnet",
     "test": "hardhat test",
     "compile": "hardhat compile"
   },
