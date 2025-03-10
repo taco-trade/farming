@@ -8,6 +8,8 @@ import {IStrategy} from "../../interfaces/IStrategy.sol";
 import {ISwapRouter} from "./periphery/ISwapRouter.sol";
 import {INonfungiblePositionManager} from "./periphery/INonfungiblePositionManager.sol";
 import "./core/TickMath.sol";
+import "./core/IPancakeV3Factory.sol";
+import "./core/IPancakeV3Pool.sol";
 
 struct StrategyAddBaseTokenOnlyWithCalculateParam {
     address baseToken;
@@ -107,13 +109,19 @@ contract PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate is
             "PancakeswapV3StrategyAddBaseTokenOnly::execute:: insufficient balance"
         );
 
-        uint256 sqrtPriceX96;  // todo: get it
-        uint256 sqrtPriceLowerX96 = TickMath.getSqrtRatioAtTick(params.tickLower);
-        uint256 sqrtPriceUpperX96 = TickMath.getSqrtRatioAtTick(params.tickUpper);
-        uint256 px = 1 / sqrtPriceX96 - 1 / sqrtPriceUpperX96;
-        uint256 py = sqrtPriceX96 - sqrtPriceLowerX96;
-        uint256 liq = params.totalAmount / (px + py);
-        uint256 swapAmount = liq * py;
+        address poolAddr = IPancakeV3Factory(factory).getPool(params.baseToken, params.farmingToken, params.fee);
+        // todo: checkAddr is zero
+
+        
+
+        (uint160 sqrtPriceX96,,,,,,) = IPancakeV3Pool(poolAddr).slot0();
+        uint160 sqrtPriceLowerX96 = TickMath.getSqrtRatioAtTick(params.tickLower);
+        uint160 sqrtPriceUpperX96 = TickMath.getSqrtRatioAtTick(params.tickUpper);
+
+        uint256 px = (sqrtPriceUpperX96 - sqrtPriceX96) * 1e18 / (sqrtPriceX96 * sqrtPriceUpperX96);
+        uint256 py = (sqrtPriceX96 - sqrtPriceLowerX96) * 1e18;
+        uint256 liq = params.totalAmount * 1e18 / (px + py);
+        uint256 swapAmount = liq * py / 1e18;
 
 
         uint256 baseAmount = params.totalAmount - swapAmount;
