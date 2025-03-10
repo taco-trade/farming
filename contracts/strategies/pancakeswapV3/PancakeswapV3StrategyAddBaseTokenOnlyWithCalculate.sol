@@ -7,22 +7,21 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {IStrategy} from "../../interfaces/IStrategy.sol";
 import {ISwapRouter} from "./periphery/ISwapRouter.sol";
 import {INonfungiblePositionManager} from "./periphery/INonfungiblePositionManager.sol";
+import "./core/TickMath.sol";
 
-
-struct StrategyAddBaseTokenOnlyParam {
+struct StrategyAddBaseTokenOnlyWithCalculateParam {
     address baseToken;
     address farmingToken;
     uint256 totalAmount;
-    uint256 swapAmount;
     uint24 fee;
-    int24 tickLower;
-    int24 tickUpper;
+    int24 tickLower;    // price ?
+    int24 tickUpper;    // price ?
     uint256 amount0Min;
     uint256 amount1Min;
     bytes swapPath;
 }
 
-contract PancakeswapV3StrategyAddBaseTokenOnly is
+contract PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate is
     IStrategy,
     OwnableUpgradeable
 {
@@ -71,9 +70,9 @@ contract PancakeswapV3StrategyAddBaseTokenOnly is
         onlyWhitelistedVaults
         returns (uint8 posType, bytes memory posData)
     {
-        StrategyAddBaseTokenOnlyParam memory params = abi.decode(
+        StrategyAddBaseTokenOnlyWithCalculateParam memory params = abi.decode(
             data,
-            (StrategyAddBaseTokenOnlyParam)
+            (StrategyAddBaseTokenOnlyWithCalculateParam)
         );
 
         require(
@@ -108,13 +107,22 @@ contract PancakeswapV3StrategyAddBaseTokenOnly is
             "PancakeswapV3StrategyAddBaseTokenOnly::execute:: insufficient balance"
         );
 
-        uint256 baseAmount = params.totalAmount - params.swapAmount;
+        uint256 sqrtPriceX96;  // todo: get it
+        uint256 sqrtPriceLowerX96 = TickMath.getSqrtRatioAtTick(params.tickLower);
+        uint256 sqrtPriceUpperX96 = TickMath.getSqrtRatioAtTick(params.tickUpper);
+        uint256 px = 1 / sqrtPriceX96 - 1 / sqrtPriceUpperX96;
+        uint256 py = sqrtPriceX96 - sqrtPriceLowerX96;
+        uint256 liq = params.totalAmount / (px + py);
+        uint256 swapAmount = liq * py;
+
+
+        uint256 baseAmount = params.totalAmount - swapAmount;
         uint256 farmingAmount = ISwapRouter(router).exactInput(
             ISwapRouter.ExactInputParams(
                 params.swapPath,
                 address(this),
                 block.timestamp,
-                params.swapAmount,
+                swapAmount,
                 0
             )
         );

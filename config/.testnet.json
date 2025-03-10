@@ -1,0 +1,17 @@
+{
+  "Tokens": {
+    "MockToken0": "0xC25760C60fEC69175507e780790453014f360f73",
+    "MockToken1": "0x848FfB71A5Fe748f895Ed94ceE4f84037c5d249A",
+    "WBNB": "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd",
+    "ALPACA": "0x354b3a11D5Ea2DA89405173977E271F58bE2897D"
+  },
+  "PancakeSwapV3": {
+    "NonfungiblePositionManager": "0x427bF5b37357632377eCbEC9de3626C71A5396c1",
+    "SwapRouter": "0x1b81D678ffb9C0263b24A97847620C99d213eB14",
+    "PancakeV3Factory": "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865",
+    "Manager": "0x40a7DeB1d6CD47b982B18ca939b89C3b5C93705E",
+    "Strategies": {
+      "AddBaseTokenOnly": "0xe88E38Fdc71e497F840fA557a371d44d1afaEdd9"
+    }
+  }
+}

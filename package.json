@@ -6,7 +6,13 @@
   "scripts": {
     "scripts:bsc-test:mint": "pnpm exec hardhat run scripts/mint.ts --network bscTestnet",
     "test": "hardhat test",
-    "compile": "hardhat compile"
+    "compile": "hardhat compile",
+    "deploy:bsctestnet:manager": "hardhat --network bscTestnet deploy --no-compile --reset --tags Manager",
+    "deploy:bsctestnet:strategy:pancakeswapv3:addBaseTokenOnly": "VERIFY=true hardhat --network bscTestnet deploy --no-compile --reset --tags PancakeswapV3StrategiesAddBaseTokenOnly",
+    "deploy:bsctestnet:strategy:pancakeswapv3:execAddBaseTokenOnly": "hardhat --network bscTestnet deploy --no-compile --reset --tags ExecPancakeswapV3StrategiesAddBaseTokenOnly",
+    "deploy:bsctestnet:MockToken": "VERIFY=true hardhat --network bscTestnet deploy --no-compile --reset --tags MockToken",
+    "deploy:bsctestnet:ExecMockToken": "VERIFY=true hardhat --network bscTestnet deploy --no-compile --reset --tags ExecMockToken",
+    "deploy:bsctestnet:printInfo": "hardhat --network bscTestnet deploy --no-compile --reset --tags PrintInfo"
   },
   "keywords": [],
   "author": "",
@@ -20,10 +26,12 @@
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@openzeppelin/contracts": "^5.2.0",
     "@openzeppelin/contracts-upgradeable": "^5.2.0",
+    "@openzeppelin/hardhat-upgrades": "^3.9.0",
     "@typechain/ethers-v6": "^0.5.1",
     "@typechain/hardhat": "^9.1.0",
     "ethers": "^6.13.5",
     "hardhat": "^2.22.19",
+    "hardhat-deploy": "^0.14.0",
     "solhint": "^5.0.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.2"
