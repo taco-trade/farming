@@ -13,11 +13,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   for (const tokenAddr of tokenAddrs) {
     const token = MockToken__factory.connect(tokenAddr, deployer);
-    console.log(`${await token.name()} balance of deployer: ${await token.balanceOf(deployer.address)}`)
+    console.log(`${await token.name()} balance of deployer: ${ethers.formatEther(await token.balanceOf(deployer.address))}`)
 
-    await token.mint(deployer.address, ethers.parseEther("100000"))
+    await token.mint(deployer.address, ethers.parseEther("1000000"))
 
-    console.log(`${await token.name()} balance of deployer: ${await token.balanceOf(deployer.address)}`)
+    console.log(`${await token.name()} balance of deployer: ${ethers.formatEther(await token.balanceOf(deployer.address))}`)
   }
 
 };

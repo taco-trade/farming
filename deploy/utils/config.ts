@@ -22,6 +22,7 @@ export interface PancakeSwapV3 {
 
 export interface Strategies {
     AddBaseTokenOnly?: string
+    AddBaseTokenOnlyWithCalculate?: string
 }
 
 export function getConfig(): Config {

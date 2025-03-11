@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {IStrategy} from "../../interfaces/IStrategy.sol";
+import {IUserVault} from "../../interfaces/IUserVault.sol";
 import {ISwapRouter} from "./periphery/ISwapRouter.sol";
 import {INonfungiblePositionManager} from "./periphery/INonfungiblePositionManager.sol";
 
@@ -84,10 +85,14 @@ contract PancakeswapV3StrategyAddBaseTokenOnly is
             params.farmingToken != address(0),
             "PancakeswapV3StrategyAddBaseTokenOnly::execute:: invalid farmingToken"
         );
-        require(
-            params.swapPath.length > 1,
-            "PancakeswapV3StrategyAddBaseTokenOnly::execute:: invalid swap path"
-        );
+
+        IUserVault(msg.sender).requestFundsFromUser(params.baseToken, params.totalAmount);
+
+        // uint256 balance = IERC20(params.baseToken).balanceOf(msg.sender);
+        // require(
+        //     balance >= params.totalAmount,
+        //     "PancakeswapV3StrategyAddBaseTokenOnly::execute:: insufficient balance"
+        // );
 
         // expect price range [P0, P1], current price P in range [P0, P1]
         // if amount of token0 is  x, amount of token1 is  y
@@ -102,10 +107,12 @@ contract PancakeswapV3StrategyAddBaseTokenOnly is
         // x = L * Px
         // y = input - x = L * Py
 
-        uint256 balance = IERC20(params.baseToken).balanceOf(address(this));
-        require(
-            balance >= params.totalAmount,
-            "PancakeswapV3StrategyAddBaseTokenOnly::execute:: insufficient balance"
+
+
+        SafeERC20.safeIncreaseAllowance(
+            IERC20(params.baseToken),
+            router,
+            params.swapAmount
         );
 
         uint256 baseAmount = params.totalAmount - params.swapAmount;
@@ -133,6 +140,8 @@ contract PancakeswapV3StrategyAddBaseTokenOnly is
                 address(msg.sender),
                 block.timestamp
             );
+
+        
 
         SafeERC20.safeIncreaseAllowance(
             IERC20(mintParams.token0),

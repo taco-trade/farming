@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {IStrategy} from "../../interfaces/IStrategy.sol";
+import {IUserVault} from "../../interfaces/IUserVault.sol";
 import {ISwapRouter} from "./periphery/ISwapRouter.sol";
 import {INonfungiblePositionManager} from "./periphery/INonfungiblePositionManager.sol";
 import "./core/TickMath.sol";
@@ -44,7 +45,7 @@ contract PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate is
     modifier onlyWhitelistedVaults() {
         require(
             okVaults[msg.sender],
-            "PancakeswapV3StrategyAddBaseTokenOnly::onlyWhitelistedVaults:: bad vault"
+            "PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate::onlyWhitelistedVaults:: bad vault"
         );
         _;
     }
@@ -79,16 +80,14 @@ contract PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate is
 
         require(
             params.baseToken != address(0),
-            "PancakeswapV3StrategyAddBaseTokenOnly::execute:: invalid baseToken"
+            "PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate::execute:: invalid baseToken"
         );
         require(
             params.farmingToken != address(0),
-            "PancakeswapV3StrategyAddBaseTokenOnly::execute:: invalid farmingToken"
+            "PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate::execute:: invalid farmingToken"
         );
-        require(
-            params.swapPath.length > 1,
-            "PancakeswapV3StrategyAddBaseTokenOnly::execute:: invalid swap path"
-        );
+
+        IUserVault(msg.sender).requestFundsFromUser(params.baseToken, params.totalAmount);
 
         // expect price range [P0, P1], current price P in range [P0, P1]
         // if amount of token0 is  x, amount of token1 is  y
@@ -103,27 +102,27 @@ contract PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate is
         // x = L * Px
         // y = input - x = L * Py
 
-        uint256 balance = IERC20(params.baseToken).balanceOf(address(this));
-        require(
-            balance >= params.totalAmount,
-            "PancakeswapV3StrategyAddBaseTokenOnly::execute:: insufficient balance"
-        );
-
         address poolAddr = IPancakeV3Factory(factory).getPool(params.baseToken, params.farmingToken, params.fee);
         // todo: checkAddr is zero
 
         
-
         (uint160 sqrtPriceX96,,,,,,) = IPancakeV3Pool(poolAddr).slot0();
         uint160 sqrtPriceLowerX96 = TickMath.getSqrtRatioAtTick(params.tickLower);
         uint160 sqrtPriceUpperX96 = TickMath.getSqrtRatioAtTick(params.tickUpper);
 
-        uint256 px = (sqrtPriceUpperX96 - sqrtPriceX96) * 1e18 / (sqrtPriceX96 * sqrtPriceUpperX96);
-        uint256 py = (sqrtPriceX96 - sqrtPriceLowerX96) * 1e18;
-        uint256 liq = params.totalAmount * 1e18 / (px + py);
-        uint256 swapAmount = liq * py / 1e18;
+        uint256 X96 = uint256(1 << 96);
+
+        uint256 pxX96 = uint256(X96 * X96 / sqrtPriceX96) - uint256(X96 * X96 / sqrtPriceUpperX96);
+        uint256 pyX96 = uint256(sqrtPriceX96 - sqrtPriceLowerX96);
+        uint256 liq = uint256(params.totalAmount * X96) / (pxX96 + pyX96);
+        uint256 swapAmount = liq * pyX96 / X96;  
 
 
+        SafeERC20.safeIncreaseAllowance(
+            IERC20(params.baseToken),
+            router,
+            swapAmount
+        );
         uint256 baseAmount = params.totalAmount - swapAmount;
         uint256 farmingAmount = ISwapRouter(router).exactInput(
             ISwapRouter.ExactInputParams(
