@@ -20,53 +20,58 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     
         const upgraded = await upgrades.upgradeProxy(proxyAddress, PancakeswapV3StrategiesAddBaseTokenOnly);
         await upgraded.waitForDeployment();
-        const recipient = upgraded.deploymentTransaction();
-        await recipient?.wait(20);
-    
+        
+        await new Promise(resolve => setTimeout(resolve, 5000)); // 等待5秒
         console.log("Proxy upgraded");
-    
         const newImplementationAddress = await upgrades.erc1967.getImplementationAddress(proxyAddress);
         console.log("New implementation address:", newImplementationAddress);
     
-        console.log("Verifying new implementation...");
-        try {
-            await hre.run("verify:verify", {
-                address: newImplementationAddress,
-                constructorArguments: [],
-            });
-            console.log("Verification successful");
-        } catch (error) {
-            console.error("Verification failed:", error);
-            console.log("You may need to verify manually");
+        if (process.env.VERIFY === 'true' && hre.network.name !== "hardhat") {
+            console.log("Verifying new implementation...");
+            try {
+                await hre.run("verify:verify", {
+                    address: newImplementationAddress,
+                    constructorArguments: [],
+                });
+                console.log("Verification successful");
+            } catch (error) {
+                console.error("Verification failed:", error);
+                console.log("You may need to verify manually");
+            }
         }
     }
 
 
     if (strategies.includes(Strats.baseTokenOnlyWithCal)) {
         const proxyAddress = config.PancakeSwapV3.Strategies.AddBaseTokenOnlyWithCalculate!
+
+        const oriImplAddr = await upgrades.erc1967.getImplementationAddress(proxyAddress);
+        console.log(`oriImplAddr: ${oriImplAddr}`)
+
         console.log("Upgrading AddBaseTokenOnlyWithCalculate proxy...");
         const PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate = (await ethers.getContractFactory("PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate", deployer)) as PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate__factory
     
         const upgraded = await upgrades.upgradeProxy(proxyAddress, PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate);
         await upgraded.waitForDeployment();
-        const recipient = upgraded.deploymentTransaction();
-        await recipient?.wait(20);
     
-        console.log("Proxy upgraded");
     
+        await new Promise(resolve => setTimeout(resolve, 5000)); // 等待5秒
         const newImplementationAddress = await upgrades.erc1967.getImplementationAddress(proxyAddress);
+        console.log("Proxy upgraded");
         console.log("New implementation address:", newImplementationAddress);
     
-        console.log("Verifying new implementation...");
-        try {
-            await hre.run("verify:verify", {
-                address: newImplementationAddress,
-                constructorArguments: [],
-            });
-            console.log("Verification successful");
-        } catch (error) {
-            console.error("Verification failed:", error);
-            console.log("You may need to verify manually");
+        if (process.env.VERIFY === 'true' && hre.network.name !== "hardhat") {
+            console.log("Verifying new implementation...");
+            try {
+                await hre.run("verify:verify", {
+                    address: newImplementationAddress,
+                    constructorArguments: [],
+                });
+                console.log("Verification successful");
+            } catch (error) {
+                console.error("Verification failed:", error);
+                console.log("You may need to verify manually");
+            }
         }
     }
     

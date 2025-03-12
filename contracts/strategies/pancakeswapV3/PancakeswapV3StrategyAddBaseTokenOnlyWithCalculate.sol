@@ -103,7 +103,7 @@ contract PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate is
         // y = input - x = L * Py
 
         address poolAddr = IPancakeV3Factory(factory).getPool(params.baseToken, params.farmingToken, params.fee);
-        // todo: checkAddr is zero
+        // todo: check poolAddr is zero
 
         
         (uint160 sqrtPriceX96,,,,,,) = IPancakeV3Pool(poolAddr).slot0();
