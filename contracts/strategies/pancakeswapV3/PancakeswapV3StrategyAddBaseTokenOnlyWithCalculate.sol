@@ -8,6 +8,7 @@ import {IStrategy} from "../../interfaces/IStrategy.sol";
 import {IUserVault} from "../../interfaces/IUserVault.sol";
 import {ISwapRouter} from "./periphery/ISwapRouter.sol";
 import {INonfungiblePositionManager} from "./periphery/INonfungiblePositionManager.sol";
+import "./core/LiqMath.sol";
 import "./core/TickMath.sol";
 import "./core/IPancakeV3Factory.sol";
 import "./core/IPancakeV3Pool.sol";
@@ -89,34 +90,27 @@ contract PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate is
 
         IUserVault(msg.sender).requestFundsFromUser(params.baseToken, params.totalAmount);
 
-        // expect price range [P0, P1], current price P in range [P0, P1]
-        // if amount of token0 is  x, amount of token1 is  y
-        // then L = x/ (1/sqrt{P} - 1/sqrt{P1}) = y/(sqrt{P} - sqrt{P0})
-        // now we know input = x+y, and P0, P1, P, how to get x, y
-
-        // sqrt{P0} = (sqrt{1.0001})^lowerIndex
-        // sqrt{P1} = (sqrt{1.0001})^upperIndex
-        // Px = 1/sqrt{P} - 1/sqrt{P1}
-        // Py = sqrt{P} - sqrt{P0}
-        // L = input / (Px + Py)
-        // x = L * Px
-        // y = input - x = L * Py
-
         address poolAddr = IPancakeV3Factory(factory).getPool(params.baseToken, params.farmingToken, params.fee);
         // todo: check poolAddr is zero
 
-        
+        // token1/token0
         (uint160 sqrtPriceX96,,,,,,) = IPancakeV3Pool(poolAddr).slot0();
         uint160 sqrtPriceLowerX96 = TickMath.getSqrtRatioAtTick(params.tickLower);
         uint160 sqrtPriceUpperX96 = TickMath.getSqrtRatioAtTick(params.tickUpper);
 
-        uint256 X96 = uint256(1 << 96);
 
-        uint256 pxX96 = uint256(X96 * X96 / sqrtPriceX96) - uint256(X96 * X96 / sqrtPriceUpperX96);
-        uint256 pyX96 = uint256(sqrtPriceX96 - sqrtPriceLowerX96);
-        uint256 liq = uint256(params.totalAmount * X96) / (pxX96 + pyX96);
-        uint256 swapAmount = liq * pyX96 / X96;  
 
+        
+        address token0Addr = IPancakeV3Pool(poolAddr).token0();
+        uint256 swapAmount;
+        address token1Addr;
+        if (params.baseToken == token0Addr) {
+            token1Addr = params.farmingToken;
+            swapAmount = LiqMath.getToken0SwapAmount(sqrtPriceX96, sqrtPriceLowerX96, sqrtPriceUpperX96, params.totalAmount);
+        } else {
+            token1Addr = params.baseToken;
+            swapAmount = LiqMath.getToken1SwapAmount(sqrtPriceX96, sqrtPriceLowerX96, sqrtPriceUpperX96, params.totalAmount);
+        }
 
         SafeERC20.safeIncreaseAllowance(
             IERC20(params.baseToken),
@@ -136,13 +130,13 @@ contract PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate is
 
         INonfungiblePositionManager.MintParams
             memory mintParams = INonfungiblePositionManager.MintParams(
-                params.baseToken,
-                params.farmingToken,
+                token0Addr,
+                token1Addr,
                 params.fee,
                 params.tickLower,
                 params.tickUpper,
-                baseAmount,
-                farmingAmount,
+                params.baseToken == token0Addr ? baseAmount : farmingAmount,
+                params.baseToken == token0Addr ? farmingAmount : baseAmount,
                 params.amount0Min,
                 params.amount1Min,
                 address(msg.sender),
