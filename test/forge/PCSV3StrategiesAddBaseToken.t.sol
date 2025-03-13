@@ -6,6 +6,7 @@ import "forge-std/console.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IManager} from "../../contracts/interfaces/IManager.sol";
 import {UserVault} from "../../contracts/UserVault.sol";
+import {Position} from "../../contracts/interfaces/IUserVault.sol";
 import {StrategyAddBaseTokenOnlyWithCalculateParam, PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate} from "../../contracts/strategies/pancakeswapV3/PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate.sol";
 
 contract PCSV3StrategiesAddBaseTokenTest is Test {
@@ -55,10 +56,13 @@ contract PCSV3StrategiesAddBaseTokenTest is Test {
         address sender = makeAddr("realUser");
 
         vm.startPrank(sender);
-        address userVault = creatUserValut(sender);
+        UserVault userVault = UserVault(creatUserValut(sender));
 
-        console.log("userVault: ", userVault);
-        console.log("userVault is ok? ", strategyAddBaseTokenOnly.okVaults(userVault));
+        console.log("userVault: ", address(userVault));
+        console.log(
+            "userVault is ok? ",
+            strategyAddBaseTokenOnly.okVaults(address(userVault))
+        );
 
         deal(address(token0), sender, 100 ether);
         deal(address(token1), sender, 100 ether);
@@ -78,6 +82,14 @@ contract PCSV3StrategiesAddBaseTokenTest is Test {
                 abi.encodePacked(token0, fee, token1)
             );
         vm.startPrank(sender);
+
+        uint256 nextPosId = userVault.nextPositionId();
+        console.log(nextPosId);
         manager.work(0, address(strategyAddBaseTokenOnly), abi.encode(params));
+
+        Position memory pos = userVault.positions(nextPosId);
+        uint256 tokenID = abi.decode(pos.data, (uint256));
+        console.log("posType: ", pos.posType);
+        console.log("tokenId: ", tokenID);
     }
 }
