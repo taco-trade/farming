@@ -6,9 +6,9 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
-import {INonfungiblePositionManager, DecreaseLiquidityParams} from "../interfaces/INonfungiblePositionManager.sol";
-import {IStrategy} from "../interfaces/IStrategy.sol";
-import {IUserVault, Position} from "../interfaces/IUserVault.sol";
+import {INonfungiblePositionManager} from "../../interfaces/pancakeswapV3/periphery/INonfungiblePositionManager.sol";
+import {IStrategy} from "../../interfaces/IStrategy.sol";
+import {IUserVault, Position} from "../../interfaces/IUserVault.sol";
 
 enum Receipient {
     User,
@@ -76,7 +76,7 @@ contract PancakeSwapV3DecreaseLiquidity is IStrategy {
 
         // Decrease liquidity
         INonfungiblePositionManager(positionManager).decreaseLiquidity(
-            DecreaseLiquidityParams({
+            INonfungiblePositionManager.DecreaseLiquidityParams({
                 tokenId: _tokenId,
                 liquidity: params.liquidity,
                 amount0Min: params.amount0Min,

@@ -3,9 +3,9 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {INonfungiblePositionManager, MintParams} from "../interfaces/INonfungiblePositionManager.sol";
-import {IStrategy} from "../interfaces/IStrategy.sol";
-import {IUserVault} from "../interfaces/IUserVault.sol";
+import {INonfungiblePositionManager} from "../../interfaces/pancakeswapV3/periphery/INonfungiblePositionManager.sol";
+import {IStrategy} from "../../interfaces/IStrategy.sol";
+import {IUserVault} from "../../interfaces/IUserVault.sol";
 
 contract PancakeSwapV3Mint is IStrategy, IERC721Receiver {
     address public factory;
@@ -23,7 +23,7 @@ contract PancakeSwapV3Mint is IStrategy, IERC721Receiver {
         uint256 /* _positionID */,
         bytes calldata _data
     ) external override returns (uint8 posType, bytes memory posData) {
-        MintParams memory params = abi.decode(_data, (MintParams));
+        INonfungiblePositionManager.MintParams memory params = abi.decode(_data, (INonfungiblePositionManager.MintParams));
 
         SafeERC20.safeIncreaseAllowance(
             IERC20(params.token0),

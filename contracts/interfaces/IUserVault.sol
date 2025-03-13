@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "./IStrategy.sol";
-import "./INonfungiblePositionManager.sol";
+import "./pancakeswapV3/periphery/INonfungiblePositionManager.sol";
 
 struct Position {
     // position NFT token ID
