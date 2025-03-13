@@ -22,10 +22,6 @@ interface IUserVault is IERC721Receiver {
     function manager() external view returns (address);
     function agent() external view returns (address);
     function agentPoolAllowList(bytes32) external view returns (bool);
-    function nftPositionManager()
-        external
-        view
-        returns (INonfungiblePositionManager);
     function positions(uint256) external view returns (Position memory);
 
     // State-Changing Functions

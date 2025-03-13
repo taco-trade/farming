@@ -10,21 +10,10 @@ import "./interfaces/pancakeswapV3/periphery/INonfungiblePositionManager.sol";
 import {Position, IUserVault} from "./interfaces/IUserVault.sol";
 
 contract UserVault is IUserVault {
-    // Custom errors
-    error OnlyManager();
-    error NotWithinExecutionScope();
-    error NotFromStrategy();
-    error InExecLock();
-    error NotUser();
-    error NotInExec();
-    error BadPositionID();
-
     address public immutable user;
     address public immutable manager;
-
     address private _agent;
 
-    INonfungiblePositionManager public nftPositionManager;
     mapping(bytes32 => bool) public agentPoolAllowList;
     mapping(uint256 => Position) private _positions;
     uint256 public nextPositionId;
@@ -40,6 +29,15 @@ contract UserVault is IUserVault {
     uint256 public POSITION_ID;
     address public STRATEGY;
 
+    // Custom errors
+    error OnlyManager();
+    error NotWithinExecutionScope();
+    error NotFromStrategy();
+    error InExecLock();
+    error NotUser();
+    error NotInExec();
+    error BadPositionID();
+
     modifier onlyManager() {
         if (msg.sender != manager) revert OnlyManager();
         _;
@@ -54,10 +52,9 @@ contract UserVault is IUserVault {
         _IN_EXEC_LOCK = _NOT_ENTERED;
     }
 
-    constructor(address _user, address _manager, address _nftPositionManager) {
+    constructor(address _user, address _manager) {
         user = _user;
         manager = _manager;
-        nftPositionManager = INonfungiblePositionManager(_nftPositionManager);
         nextPositionId = 1;
 
         _IN_EXEC_LOCK = _NOT_ENTERED;

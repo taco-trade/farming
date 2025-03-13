@@ -1,18 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./interfaces/IManager.sol";
 import "./UserVault.sol";
 
-contract Manager is IManager, Ownable {
-    error PoolNotWhitelisted();
-    error NotUserNorAgent();
-    error NoVault();
-    error PoolNotInGlobalWhitelist();
-    error VaultAlreadyExists();
+contract Manager is IManager, OwnableUpgradeable {
     /// state variables
-    address public immutable nftPositionManager;
+    address public nftPositionManager;
 
     /// @notice keccak256(token0, token1, fee) -> bool, indicates whether the pool is in the global whitelist
     mapping(bytes32 => bool) public poolWhiteList;
@@ -20,7 +15,18 @@ contract Manager is IManager, Ownable {
     /// @notice user address => user's dedicated UserVault
     mapping(address => address) public userVaults;
 
-    constructor(address _owner, address _nftPositionManager) Ownable(_owner) {
+    /// @notice errors
+    error PoolNotWhitelisted();
+    error NotUserNorAgent();
+    error NoVault();
+    error PoolNotInGlobalWhitelist();
+    error VaultAlreadyExists();
+
+    function initialize(
+        address _owner,
+        address _nftPositionManager
+    ) external initializer {
+        OwnableUpgradeable.__Ownable_init(_owner);
         nftPositionManager = _nftPositionManager;
     }
 
@@ -65,19 +71,15 @@ contract Manager is IManager, Ownable {
         // 1. Check if the caller is the user themselves or the vault's agent
         UserVault v = UserVault(vaultAddr);
         address currentAgent = v.agent(); // the agent address recorded in the vault
-        if (msg.sender != msg.sender && msg.sender != currentAgent) revert NotUserNorAgent();
+        if (msg.sender != msg.sender && msg.sender != currentAgent)
+            revert NotUserNorAgent();
 
         // 2. Call the vault's managerWork to perform the actual operation
-        UserVault(vaultAddr).work(
-            msg.sender,
-            _positionID,
-            _strategy,
-            _data
-        );
+        UserVault(vaultAddr).work(msg.sender, _positionID, _strategy, _data);
     }
 
-     /// @notice Allows a user to set their agent address in the manager
-     /// @param newAgent New agent address
+    /// @notice Allows a user to set their agent address in the manager
+    /// @param newAgent New agent address
     function setAgent(address newAgent) external {
         address vaultAddr = userVaults[msg.sender];
         if (vaultAddr == address(0)) revert NoVault();
@@ -109,7 +111,7 @@ contract Manager is IManager, Ownable {
 
     /// @dev Internal function to create a UserVault for a user
     function _createUserVault(address _user) internal returns (address) {
-        UserVault vault = new UserVault(_user, address(this), nftPositionManager);
+        UserVault vault = new UserVault(_user, address(this));
         userVaults[_user] = address(vault);
         emit CreateUserVault(_user, address(vault));
         return address(vault);
