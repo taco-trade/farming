@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -22,10 +23,11 @@ struct StrategyParams {
     Receipient recipient;
 }
 
-contract PancakeSwapV3DecreaseLiquidity is IStrategy {
+contract PancakeSwapV3DecreaseLiquidity is IStrategy, OwnableUpgradeable {
     address public positionManager;
 
-    constructor(address _positionManager) {
+    function initialize(address _positionManager) external initializer {
+        OwnableUpgradeable.__Ownable_init(msg.sender);
         positionManager = _positionManager;
     }
 
