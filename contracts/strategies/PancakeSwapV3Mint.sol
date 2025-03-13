@@ -19,7 +19,8 @@ contract PancakeSwapV3Mint is IStrategy, IERC721Receiver {
     }
 
     function execute(
-        address /* _user */,
+        address /* _caller */,
+        uint256 /* _positionID */,
         bytes calldata _data
     ) external override returns (uint8 posType, bytes memory posData) {
         MintParams memory params = abi.decode(_data, (MintParams));
@@ -41,10 +42,14 @@ contract PancakeSwapV3Mint is IStrategy, IERC721Receiver {
         params.recipient = msg.sender;
         params.deadline = block.timestamp;
 
-        (uint256 tokenID, , , ) = INonfungiblePositionManager(positionManager)
+        (uint256 tokenID,,, ) = INonfungiblePositionManager(positionManager)
             .mint(params);
 
-        return (uint8(PositionType.V3_LP), abi.encode(tokenID));
+        return (uint8(PositionType.V3_LP), abi.encode(V3Position({
+            tokenId: tokenID,
+            token0: params.token0,
+            token1: params.token1
+        })));
     }
 
     function onERC721Received(

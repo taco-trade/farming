@@ -21,6 +21,7 @@ const config: HardhatUserConfig = {
     },
     bscTestnet: {
       url: BSC_TESTNET_RPC,
+      chainId: 97,
       accounts: [PRIVATE_KEY],
     },
   },

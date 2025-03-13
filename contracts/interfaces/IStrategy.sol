@@ -6,13 +6,20 @@ interface IStrategy {
         V3_LP
     }
 
+    struct V3Position {
+        uint256 tokenId;
+        address token0;
+        address token1;
+    }
+
     /**
      * @notice Called by UserVault in managerWork(...) to delegate actual operation logic to strategy
-     * @param user   The user address corresponding to the UserVault
+     * @param caller   The caller address, user or agent.
      * @param data   Arbitrary custom operation parameters packed by frontend/caller
      */
     function execute(
-        address user,
+        address caller,
+        uint256 positionId,
         bytes calldata data
     ) external returns (uint8 posType, bytes memory posData);
 }

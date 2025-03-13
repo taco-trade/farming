@@ -22,7 +22,10 @@ interface IUserVault is IERC721Receiver {
     function manager() external view returns (address);
     function agent() external view returns (address);
     function agentPoolAllowList(bytes32) external view returns (bool);
-    function nftPositionManager() external view returns (INonfungiblePositionManager);
+    function nftPositionManager()
+        external
+        view
+        returns (INonfungiblePositionManager);
     function positions(uint256) external view returns (Position memory);
 
     // State-Changing Functions
@@ -44,13 +47,9 @@ interface IUserVault is IERC721Receiver {
     /// @notice Collect tokens in this contract
     function collect(address token, address recipient) external;
 
-    function requestFundsFromUser(
-        address token,
-        uint256 amount
-    ) external;
+    function requestFundsFromUser(address token, uint256 amount) external;
 
-    function requestFunds(
-        address token,
-        uint256 amount
-    ) external;
+    function requestFunds(address token, uint256 amount) external;
+
+    function requestERC721(address targetedERC721, uint256 tokenId) external;
 }

@@ -15,6 +15,14 @@ struct MintParams {
     uint256 deadline;
 }
 
+struct DecreaseLiquidityParams {
+    uint256 tokenId;
+    uint128 liquidity;
+    uint256 amount0Min;
+    uint256 amount1Min;
+    uint256 deadline;
+}
+
 /// @title Non-fungible token for positions
 /// @notice Wraps PancakeSwap V3 positions in a non-fungible token interface which allows for them to be transferred
 /// and authorized.
@@ -135,14 +143,6 @@ interface INonfungiblePositionManager {
         external
         payable
         returns (uint128 liquidity, uint256 amount0, uint256 amount1);
-
-    struct DecreaseLiquidityParams {
-        uint256 tokenId;
-        uint128 liquidity;
-        uint256 amount0Min;
-        uint256 amount1Min;
-        uint256 deadline;
-    }
 
     /// @notice Decreases the amount of liquidity in a position and accounts it to the position
     /// @param params tokenId The ID of the token for which liquidity is being decreased,

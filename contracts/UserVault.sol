@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 import "./interfaces/IStrategy.sol";
 import "./interfaces/INonfungiblePositionManager.sol";
@@ -94,14 +95,14 @@ contract UserVault is IUserVault {
             _pos = _positions[_positionID];
         } else {
             _pos = _positions[_positionID];
-            if (_positionID < nextPositionId) revert BadPositionID();
+            if (_positionID >= nextPositionId) revert BadPositionID();
         }
         // Set the execution scope
         STRATEGY = _strategy;
         POSITION_ID = _positionID;
 
         // Execute the strategy
-        (uint8 posType, bytes memory posData) = IStrategy(_strategy).execute(user, _data);
+        (uint8 posType, bytes memory posData) = IStrategy(_strategy).execute(_caller, _positionID, _data);
         _pos.posType = posType;
         _pos.data = posData;
 
@@ -160,6 +161,13 @@ contract UserVault is IUserVault {
             msg.sender,
             amount
         );
+    }
+
+    function requestERC721(
+        address targetedERC721,
+        uint256 tokenId
+    ) external inExec {
+        IERC721(targetedERC721).safeTransferFrom(address(this), msg.sender, tokenId);
     }
 
     // ---------------- IERC721Receiver ------------------ //

@@ -6,6 +6,8 @@
   "scripts": {
     "scripts:bsc-test:mint": "pnpm exec hardhat run scripts/mint.ts --network bscTestnet",
     "scripts:bsc-test:swap": "pnpm exec hardhat run scripts/router_swap_single.ts --network bscTestnet",
+    "scripts:bsc-test:decrease": "pnpm exec hardhat run scripts/decrease.ts --network bscTestnet",
+    "deploy:bsc-test": "pnpm exec hardhat ignition deploy ./ignition/modules/Manager.ts --network bscTestnet --parameters ignition/parameters.json --verify",
     "test": "hardhat test",
     "compile": "hardhat compile",
     "deploy:bsctestnet:manager": "hardhat --network bscTestnet deploy --no-compile --reset --tags Manager",

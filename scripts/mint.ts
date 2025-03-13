@@ -1,20 +1,24 @@
 import hre from "hardhat";
 import { Manager__factory } from "../typechain-types";
 import { IERC20__factory } from "../typechain-types";
+import { getDeployedAddressByModule } from "./utils/address";
 
+const MODULE = "ManagerModule"
 
 async function main() {
   const [deployer] = await hre.ethers.getSigners();
-  const managerAddr = "0x5D75D8543F41716BD7195fcBE97A219356F1a512"
-  const strategyAddr = "0x7425bC2b6a40c6817D5bd64ED4588d35fe66A6b8"
+  const chainId = hre.network.config.chainId!;
+  const managerAddr = getDeployedAddressByModule(MODULE, "Manager", chainId)
+  const strategyAddr = getDeployedAddressByModule(MODULE, "PancakeSwapV3Mint", chainId)
   const manager = Manager__factory.connect(managerAddr, deployer);
 
-  const userVault = await manager.userVaults(deployer.address);
+  var userVault = await manager.userVaults(deployer.address);
   if (userVault == hre.ethers.ZeroAddress) {
     const tx = await manager.createUserVault();
     console.log("createUserVault:", tx.hash);
     await tx.wait();
   }
+  userVault = await manager.userVaults(deployer.address);
   console.log("userVault:", userVault);
 
   const token0 = IERC20__factory.connect("0x22D873Ce502a424c7909f1B950597b39F36b6608", deployer);

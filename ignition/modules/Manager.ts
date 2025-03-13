@@ -6,13 +6,17 @@ const ManagerModule = buildModule("ManagerModule", (m) => {
     m.getParameter("nftPositionManager"),
   ]);
 
-  const strategy = m.contract("PancakeSwapV3Mint", [
+  const mintStrategy = m.contract("PancakeSwapV3Mint", [
     m.getParameter("factory"),
     m.getParameter("router"),
     m.getParameter("nftPositionManager"),
   ]);
 
-  return { manager, strategy };
+  const decreaseLiquidityStrategy = m.contract("PancakeSwapV3DecreaseLiquidity", [
+    m.getParameter("nftPositionManager"),
+  ]);
+
+  return { manager, mintStrategy, decreaseLiquidityStrategy };
 });
 
 export default ManagerModule;
