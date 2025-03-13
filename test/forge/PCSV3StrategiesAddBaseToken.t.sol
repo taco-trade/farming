@@ -21,6 +21,7 @@ contract PCSV3StrategiesAddBaseTokenTest is Test {
     IERC20 constant token1 = IERC20(0x848FfB71A5Fe748f895Ed94ceE4f84037c5d249A);
 
     address[] public actors;
+    uint16 private constant NUM_ACTORS = 10;
     address internal currentActor;
 
     modifier useActor(uint256 actorIndexSeed) {
@@ -34,11 +35,22 @@ contract PCSV3StrategiesAddBaseTokenTest is Test {
         string memory BSCTESTNET_RPC_URL = vm.envString("BSC_TESTNET_RPC");
         bsctestnetFork = vm.createFork(BSCTESTNET_RPC_URL);
         vm.selectFork(bsctestnetFork);
+
+        for (uint16 i = 0; i < NUM_ACTORS; i++) {
+            address user = makeAddr(string(abi.encodePacked("user_", i)));
+            deal(address(token0), user, 100 ether);
+            deal(address(token1), user, 100 ether);
+            actors.push(user);
+        }
     }
 
     function creatUserValut(address user) internal returns (address) {
-        manager.createUserVault();
         address userVault = manager.userVaults(user);
+        if (userVault != address(0)) {
+            return userVault;
+        }
+        manager.createUserVault();
+        userVault = manager.userVaults(user);
 
         vm.startPrank(strategyAddBaseTokenOnly.owner());
         address[] memory vaults = new address[](1);
@@ -48,15 +60,13 @@ contract PCSV3StrategiesAddBaseTokenTest is Test {
         return userVault;
     }
 
-    function testWork() public {
+    function testWork(uint256 actorIndexSeed) public useActor(actorIndexSeed) {
         uint24 fee = 2500;
         uint256 totalAmount = 1 ether;
         int24 tickLower = -25050;
         int24 tickUpper = 25050;
-        address sender = makeAddr("realUser");
 
-        vm.startPrank(sender);
-        UserVault userVault = UserVault(creatUserValut(sender));
+        UserVault userVault = UserVault(creatUserValut(currentActor));
 
         console.log("userVault: ", address(userVault));
         console.log(
@@ -64,8 +74,6 @@ contract PCSV3StrategiesAddBaseTokenTest is Test {
             strategyAddBaseTokenOnly.okVaults(address(userVault))
         );
 
-        deal(address(token0), sender, 100 ether);
-        deal(address(token1), sender, 100 ether);
         token0.approve(address(userVault), 100 ether);
         token1.approve(address(userVault), 100 ether);
 
@@ -81,7 +89,7 @@ contract PCSV3StrategiesAddBaseTokenTest is Test {
                 0, // amount1Min
                 abi.encodePacked(token0, fee, token1)
             );
-        vm.startPrank(sender);
+        vm.startPrank(currentActor);
 
         uint256 nextPosId = userVault.nextPositionId();
         console.log(nextPosId);
