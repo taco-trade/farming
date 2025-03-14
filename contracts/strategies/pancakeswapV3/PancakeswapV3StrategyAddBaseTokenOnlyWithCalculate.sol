@@ -27,6 +27,7 @@ struct StrategyAddBaseTokenOnlyWithCalculateParam {
 
 contract PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate is
     IStrategy,
+    IERC721Receiver,
     OwnableUpgradeable
 {
     address public factory;
@@ -179,5 +180,14 @@ contract PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate is
         for (uint256 idx = 0; idx < vaults.length; idx++) {
             okVaults[vaults[idx]] = isOk;
         }
+    }
+
+    function onERC721Received(
+        address /* operator */,
+        address /* from */,
+        uint256 /* tokenId */,
+        bytes calldata /* data */
+    ) external pure override returns (bytes4) {
+        return this.onERC721Received.selector;
     }
 }
