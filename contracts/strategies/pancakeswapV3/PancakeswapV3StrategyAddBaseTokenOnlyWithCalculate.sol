@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {IStrategy} from "../../interfaces/IStrategy.sol";
 import {IUserVault} from "../../interfaces/IUserVault.sol";
 import {ISwapRouter} from "../../interfaces/pancakeswapV3/periphery/ISwapRouter.sol";

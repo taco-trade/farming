@@ -7,11 +7,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IManager} from "../../contracts/interfaces/IManager.sol";
 import {Manager} from "../../contracts/Manager.sol";
 import {PancakeSwapV3Config} from "./config/PancakeSwapV3Config.sol";
+import {EnvConfig} from "./config/EnvConfig.sol";
 
 contract ManagerTest is Test {
-    uint256 bsctestnetFork;
-    IManager constant manager =
-        IManager(0x40a7DeB1d6CD47b982B18ca939b89C3b5C93705E);
+    IManager constant manager = IManager(PancakeSwapV3Config.Manager);
 
     address[] public actors;
     address internal currentActor;
@@ -24,9 +23,7 @@ contract ManagerTest is Test {
     }
 
     function setUp() public {
-        string memory BSCTESTNET_RPC_URL = vm.envString("BSC_TESTNET_RPC");
-        bsctestnetFork = vm.createFork(BSCTESTNET_RPC_URL);
-        vm.selectFork(bsctestnetFork);
+        EnvConfig.useBscTestnet(vm);
     }
 
     function testCreateVault() public {

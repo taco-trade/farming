@@ -16,7 +16,7 @@ contract PCSV3StrategiesAddBaseTokenTest is Test {
     IManager constant manager = IManager(PancakeSwapV3Config.Manager);
     IERC20 constant token0 = IERC20(PancakeSwapV3Config.Token0);
     IERC20 constant token1 = IERC20(PancakeSwapV3Config.Token1);
-    ·
+
     PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate
         internal strategyAddBaseTokenOnly;
 
