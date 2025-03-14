@@ -1,10 +1,8 @@
 import { HardhatUserConfig, vars } from "hardhat/config";
-import "@openzeppelin/hardhat-upgrades";
 import "@nomicfoundation/hardhat-toolbox";
 import "@nomicfoundation/hardhat-ignition-ethers";
 import "@nomicfoundation/hardhat-foundry";
 import "@typechain/hardhat";
-import "hardhat-deploy";
 
 const BSC_TESTNET_RPC = vars.get("BSC_TESTNET_RPC");
 const PRIVATE_KEY = vars.get("PRIVATE_KEY");
@@ -21,6 +19,7 @@ const config: HardhatUserConfig = {
     },
     bscTestnet: {
       url: BSC_TESTNET_RPC,
+      chainId: 97,
       accounts: [PRIVATE_KEY],
     },
   },

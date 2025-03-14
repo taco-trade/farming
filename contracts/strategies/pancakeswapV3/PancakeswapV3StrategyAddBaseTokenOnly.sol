@@ -6,8 +6,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {IStrategy} from "../../interfaces/IStrategy.sol";
 import {IUserVault} from "../../interfaces/IUserVault.sol";
-import {ISwapRouter} from "./periphery/ISwapRouter.sol";
-import {INonfungiblePositionManager} from "./periphery/INonfungiblePositionManager.sol";
+import {ISwapRouter} from "../../interfaces/pancakeswapV3/periphery/ISwapRouter.sol";
+import {INonfungiblePositionManager} from "../../interfaces/pancakeswapV3/periphery/INonfungiblePositionManager.sol";
 
 
 struct StrategyAddBaseTokenOnlyParam {
@@ -65,6 +65,7 @@ contract PancakeswapV3StrategyAddBaseTokenOnly is
     /// @param data Extra calldata information passed along to this strategy.
     function execute(
         address /* user */,
+        uint256 /* positionID */,
         bytes calldata data
     )
         external
@@ -164,7 +165,11 @@ contract PancakeswapV3StrategyAddBaseTokenOnly is
             baseAmount,
             farmingAmount
         );
-        return (uint8(PositionType.V3_LP), abi.encode(tokenID));
+        return (uint8(PositionType.V3_LP), abi.encode(V3Position({
+            tokenId: tokenID,
+            token0: params.baseToken,
+            token1: params.farmingToken
+        })));
     }
 
     function setVaultsOk(

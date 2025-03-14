@@ -3,27 +3,17 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 import "./interfaces/IStrategy.sol";
-import "./interfaces/INonfungiblePositionManager.sol";
+import "./interfaces/pancakeswapV3/periphery/INonfungiblePositionManager.sol";
 import {Position, IUserVault} from "./interfaces/IUserVault.sol";
 
 contract UserVault is IUserVault {
-    // Custom errors
-    error OnlyManager();
-    error NotWithinExecutionScope();
-    error NotFromStrategy();
-    error InExecLock();
-    error NotUser();
-    error NotInExec();
-    error BadPositionID();
-
     address public immutable user;
     address public immutable manager;
-
     address private _agent;
 
-    INonfungiblePositionManager public nftPositionManager;
     mapping(bytes32 => bool) public agentPoolAllowList;
     mapping(uint256 => Position) private _positions;
     uint256 public nextPositionId;
@@ -39,6 +29,15 @@ contract UserVault is IUserVault {
     uint256 public POSITION_ID;
     address public STRATEGY;
 
+    // Custom errors
+    error OnlyManager();
+    error NotWithinExecutionScope();
+    error NotFromStrategy();
+    error InExecLock();
+    error NotUser();
+    error NotInExec();
+    error BadPositionID();
+
     modifier onlyManager() {
         if (msg.sender != manager) revert OnlyManager();
         _;
@@ -53,10 +52,9 @@ contract UserVault is IUserVault {
         _IN_EXEC_LOCK = _NOT_ENTERED;
     }
 
-    constructor(address _user, address _manager, address _nftPositionManager) {
+    constructor(address _user, address _manager) {
         user = _user;
         manager = _manager;
-        nftPositionManager = INonfungiblePositionManager(_nftPositionManager);
         nextPositionId = 1;
 
         _IN_EXEC_LOCK = _NOT_ENTERED;
@@ -94,14 +92,14 @@ contract UserVault is IUserVault {
             _pos = _positions[_positionID];
         } else {
             _pos = _positions[_positionID];
-            if (_positionID < nextPositionId) revert BadPositionID();
+            if (_positionID >= nextPositionId) revert BadPositionID();
         }
         // Set the execution scope
         STRATEGY = _strategy;
         POSITION_ID = _positionID;
 
         // Execute the strategy
-        (uint8 posType, bytes memory posData) = IStrategy(_strategy).execute(user, _data);
+        (uint8 posType, bytes memory posData) = IStrategy(_strategy).execute(_caller, _positionID, _data);
         _pos.posType = posType;
         _pos.data = posData;
 
@@ -160,6 +158,13 @@ contract UserVault is IUserVault {
             msg.sender,
             amount
         );
+    }
+
+    function requestERC721(
+        address targetedERC721,
+        uint256 tokenId
+    ) external inExec {
+        IERC721(targetedERC721).safeTransferFrom(address(this), msg.sender, tokenId);
     }
 
     // ---------------- IERC721Receiver ------------------ //
