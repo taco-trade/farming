@@ -9,16 +9,16 @@ import {UserVault} from "../../contracts/UserVault.sol";
 import {Position} from "../../contracts/interfaces/IUserVault.sol";
 import {StrategyAddBaseTokenOnlyWithCalculateParam, PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate} from "../../contracts/strategies/pancakeswapV3/PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate.sol";
 
+import {PancakeSwapV3Config} from "./config/PancakeSwapV3Config.sol";
+import {EnvConfig} from "./config/EnvConfig.sol";
+
 contract PCSV3StrategiesAddBaseTokenTest is Test {
-    uint256 bsctestnetFork;
-    IManager constant manager =
-        IManager(0x40a7DeB1d6CD47b982B18ca939b89C3b5C93705E);
-    PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate constant strategyAddBaseTokenOnly =
-        PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate(
-            0x175871F6f9B29cfb9BedD4FddE1C5feCAfC05cA5
-        );
-    IERC20 constant token0 = IERC20(0xC25760C60fEC69175507e780790453014f360f73);
-    IERC20 constant token1 = IERC20(0x848FfB71A5Fe748f895Ed94ceE4f84037c5d249A);
+    IManager constant manager = IManager(PancakeSwapV3Config.Manager);
+    IERC20 constant token0 = IERC20(PancakeSwapV3Config.Token0);
+    IERC20 constant token1 = IERC20(PancakeSwapV3Config.Token1);
+    ·
+    PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate
+        internal strategyAddBaseTokenOnly;
 
     address[] public actors;
     uint16 private constant NUM_ACTORS = 10;
@@ -32,9 +32,21 @@ contract PCSV3StrategiesAddBaseTokenTest is Test {
     }
 
     function setUp() public {
-        string memory BSCTESTNET_RPC_URL = vm.envString("BSC_TESTNET_RPC");
-        bsctestnetFork = vm.createFork(BSCTESTNET_RPC_URL);
-        vm.selectFork(bsctestnetFork);
+        EnvConfig.useBscTestnet(vm);
+
+        address owner = makeAddr("owner");
+        vm.startPrank(owner);
+
+        strategyAddBaseTokenOnly = PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate(
+            0x175871F6f9B29cfb9BedD4FddE1C5feCAfC05cA5
+        );
+
+        // strategyAddBaseTokenOnly = new PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate();
+        // strategyAddBaseTokenOnly.initialize(
+        //     PancakeSwapV3Config.PancakeV3Factory,
+        //     PancakeSwapV3Config.SwapRouter,
+        //     PancakeSwapV3Config.NonfungiblePositionManager
+        // );
 
         for (uint16 i = 0; i < NUM_ACTORS; i++) {
             address user = makeAddr(string(abi.encodePacked("user_", i)));

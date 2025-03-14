@@ -5,6 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IManager} from "../../contracts/interfaces/IManager.sol";
+import {Manager} from "../../contracts/Manager.sol";
+import {PancakeSwapV3Config} from "./config/PancakeSwapV3Config.sol";
 
 contract ManagerTest is Test {
     uint256 bsctestnetFork;
@@ -39,7 +41,7 @@ contract ManagerTest is Test {
         address sender = msg.sender;
         vm.startPrank(sender);
         manager.createUserVault();
-        
+
         vm.expectRevert();
         manager.createUserVault();
     }
