@@ -2,27 +2,29 @@
 pragma solidity ^0.8.0;
 
 interface IManager {
-    function poolWhiteList(bytes32) external view returns (bool);
+    event CreateUserVault(address indexed user, address vault);
+    event UpdateApprovedPool(bytes32 pool, bool allowed);
+    event UpdateApprovedStrategy(address strategy, bool allowed);
+    event Collect(address indexed user, address token, address recipient);
+
+    function approvedPools(bytes32) external view returns (bool);
+
+    function approvedStrategies(address) external view returns (bool);
 
     function userVaults(address) external view returns (address);
 
-    event CreateUserVault(address indexed user, address vault);
-    event UpdatePoolWhiteList(
-        address token0,
-        address token1,
-        uint24 fee,
-        bool allowed
-    );
-    event Collect(address indexed user, address token, address recipient);
-
     function createUserVault() external;
 
-    function setPoolWhiteList(
+    function setApprovedPools(bytes32[] calldata pools, bool allowed) external;
+
+    function updateAgentAllowedPool(
         address token0,
         address token1,
         uint24 fee,
         bool allowed
     ) external;
+
+    function setApprovedStrategies(address[] calldata strategies, bool allowed) external;
 
     function work(
         uint256 _positionID,
@@ -31,13 +33,6 @@ interface IManager {
     ) external;
 
     function setAgent(address newAgent) external;
-
-    function updateAgentAllowedPool(
-        address token0,
-        address token1,
-        uint24 fee,
-        bool allowed
-    ) external;
 
     function collect(address token, address recipient) external;
 }

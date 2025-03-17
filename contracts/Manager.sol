@@ -13,10 +13,13 @@ contract Manager is IManager, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     address public userVaultFactory;
 
     /// @notice keccak256(token0, token1, fee) -> bool, indicates whether the pool is in the global whitelist
-    mapping(bytes32 => bool) public poolWhiteList;
+    mapping(bytes32 => bool) public approvedPools;
 
     /// @notice user address => user's dedicated UserVault
     mapping(address => address) public userVaults;
+
+    /// @notice strategy address => allowed
+    mapping(address => bool) public approvedStrategies;
 
     /// @notice errors
     error PoolNotWhitelisted();
@@ -24,6 +27,7 @@ contract Manager is IManager, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     error NoVault();
     error PoolNotInGlobalWhitelist();
     error VaultAlreadyExists();
+    error StrategyNotWhitelisted();
 
     function initialize(
         address _owner,
@@ -35,24 +39,25 @@ contract Manager is IManager, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     }
 
     /// @notice Admin function to set pool whitelist for token pairs
-    /// @param token0 The first token of the pool
-    /// @param token1 The second token of the pool
-    /// @param fee The fee of the pool
-    /// @param allowed Whether the pool is in the whitelist
-    function setPoolWhiteList(
-        address token0,
-        address token1,
-        uint24 fee,
-        bool allowed
-    ) external onlyOwner {
-        bytes32 key = _getPoolKey(token0, token1, fee);
-        poolWhiteList[key] = allowed;
-        emit UpdatePoolWhiteList(token0, token1, fee, allowed);
+    function setApprovedPools(bytes32[] calldata pools, bool allowed) external onlyOwner {
+        for (uint256 i = 0; i < pools.length; i++) {
+            approvedPools[pools[i]] = allowed;
+            emit UpdateApprovedPool(pools[i], allowed);
+        }
     }
 
+    /// @notice Creates a new UserVault for a user
     function createUserVault() external {
         if (userVaults[msg.sender] != address(0)) revert VaultAlreadyExists();
         _createUserVault(msg.sender);
+    }
+
+    /// @notice Admin function to set strategy whitelist
+    function setApprovedStrategies(address[] calldata strategies, bool allowed) external onlyOwner {
+        for (uint256 i = 0; i < strategies.length; i++) {
+            approvedStrategies[strategies[i]] = allowed;
+            emit UpdateApprovedStrategy(strategies[i], allowed);
+        }
     }
 
     /// @notice Executes unified operations on a pool position for a user;
@@ -71,13 +76,16 @@ contract Manager is IManager, OwnableUpgradeable, ReentrancyGuardUpgradeable {
             revert NoVault();
         }
 
-        // 1. Check if the caller is the user themselves or the vault's agent
+        // 1. Check if the strategy is whitelisted
+        if (!approvedStrategies[_strategy]) revert StrategyNotWhitelisted();
+
+        // 2. Check if the caller is the user themselves or the vault's agent
         UserVault v = UserVault(vaultAddr);
         address currentAgent = v.agent(); // the agent address recorded in the vault
         if (msg.sender != msg.sender && msg.sender != currentAgent)
             revert NotUserNorAgent();
 
-        // 2. Call the vault's managerWork to perform the actual operation
+        // 3. Call the vault's managerWork to perform the actual operation
         UserVault(vaultAddr).work(msg.sender, _positionID, _strategy, _data);
     }
 
@@ -99,7 +107,7 @@ contract Manager is IManager, OwnableUpgradeable, ReentrancyGuardUpgradeable {
         address vaultAddr = userVaults[msg.sender];
         if (vaultAddr == address(0)) revert NoVault();
         bytes32 key = _getPoolKey(token0, token1, fee);
-        if (!poolWhiteList[key]) revert PoolNotInGlobalWhitelist();
+        if (!approvedPools[key]) revert PoolNotInGlobalWhitelist();
 
         UserVault(vaultAddr).updateAgentAllowedPool(msg.sender, key, allowed);
     }
