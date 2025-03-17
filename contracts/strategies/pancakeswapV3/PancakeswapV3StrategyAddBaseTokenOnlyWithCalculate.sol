@@ -19,8 +19,8 @@ struct StrategyAddBaseTokenOnlyWithCalculateParam {
     address farmingToken;
     uint256 totalAmount;
     uint24 fee;
-    int24 tickLower;    // price ?
-    int24 tickUpper;    // price ?
+    int24 tickLower; // price ?
+    int24 tickUpper; // price ?
     uint256 amount0Min;
     uint256 amount1Min;
     bytes swapPath;
@@ -58,18 +58,17 @@ contract PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate is
     /// @dev Execute strategy. Take BaseToken. Return LP tokens.
     /// @param data Extra calldata information passed along to this strategy.
     function execute(
-        address /* user */,
+        address _caller,
         uint256 /* positionID */,
         bytes calldata data
-    )
-        external
-        override
-        returns (uint8 posType, bytes memory posData)
-    {
-        StrategyAddBaseTokenOnlyWithCalculateParam memory params = abi.decode(
-            data,
-            (StrategyAddBaseTokenOnlyWithCalculateParam)
-        );
+    ) external override returns (uint8 posType, bytes memory posData) {
+        (
+            bool _userFund,
+            StrategyAddBaseTokenOnlyWithCalculateParam memory params
+        ) = abi.decode(
+                data,
+                (bool, StrategyAddBaseTokenOnlyWithCalculateParam)
+            );
 
         require(
             params.baseToken != address(0),
@@ -80,28 +79,65 @@ contract PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate is
             "PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate::execute:: invalid farmingToken"
         );
 
-        IUserVault(msg.sender).requestFundsFromUser(params.baseToken, params.totalAmount);
+        if (
+            !_validateAgent(
+                _caller,
+                _userFund,
+                params.baseToken,
+                params.farmingToken,
+                params.fee
+            )
+        ) {
+            revert NotAuthorized();
+        }
 
-        address poolAddr = IPancakeV3Factory(factory).getPool(params.baseToken, params.farmingToken, params.fee);
+        if (_userFund) {
+            IUserVault(msg.sender).requestFundsFromUser(
+                params.baseToken,
+                params.totalAmount
+            );
+        } else {
+            IUserVault(msg.sender).requestFunds(
+                params.baseToken,
+                params.totalAmount
+            );
+        }
+
+        address poolAddr = IPancakeV3Factory(factory).getPool(
+            params.baseToken,
+            params.farmingToken,
+            params.fee
+        );
         // todo: check poolAddr is zero
 
         // token1/token0
-        (uint160 sqrtPriceX96,,,,,,) = IPancakeV3Pool(poolAddr).slot0();
-        uint160 sqrtPriceLowerX96 = TickMath.getSqrtRatioAtTick(params.tickLower);
-        uint160 sqrtPriceUpperX96 = TickMath.getSqrtRatioAtTick(params.tickUpper);
+        (uint160 sqrtPriceX96, , , , , , ) = IPancakeV3Pool(poolAddr).slot0();
+        uint160 sqrtPriceLowerX96 = TickMath.getSqrtRatioAtTick(
+            params.tickLower
+        );
+        uint160 sqrtPriceUpperX96 = TickMath.getSqrtRatioAtTick(
+            params.tickUpper
+        );
 
-
-
-        
         address token0Addr = IPancakeV3Pool(poolAddr).token0();
         uint256 swapAmount;
         address token1Addr;
         if (params.baseToken == token0Addr) {
             token1Addr = params.farmingToken;
-            swapAmount = LiqMath.getToken0SwapAmount(sqrtPriceX96, sqrtPriceLowerX96, sqrtPriceUpperX96, params.totalAmount);
+            swapAmount = LiqMath.getToken0SwapAmount(
+                sqrtPriceX96,
+                sqrtPriceLowerX96,
+                sqrtPriceUpperX96,
+                params.totalAmount
+            );
         } else {
             token1Addr = params.baseToken;
-            swapAmount = LiqMath.getToken1SwapAmount(sqrtPriceX96, sqrtPriceLowerX96, sqrtPriceUpperX96, params.totalAmount);
+            swapAmount = LiqMath.getToken1SwapAmount(
+                sqrtPriceX96,
+                sqrtPriceLowerX96,
+                sqrtPriceUpperX96,
+                params.totalAmount
+            );
         }
 
         SafeERC20.safeIncreaseAllowance(
@@ -156,11 +192,17 @@ contract PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate is
             baseAmount,
             farmingAmount
         );
-        return (uint8(PositionType.V3_LP), abi.encode(V3Position({
-            tokenId: tokenID,
-            token0: params.baseToken,
-            token1: params.farmingToken
-        })));
+        return (
+            uint8(PositionType.V3_LP),
+            abi.encode(
+                V3Position({
+                    tokenId: tokenID,
+                    token0: params.baseToken,
+                    token1: params.farmingToken,
+                    fee: params.fee
+                })
+            )
+        );
     }
 
     function onERC721Received(
@@ -170,5 +212,38 @@ contract PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate is
         bytes calldata /* data */
     ) external pure override returns (bytes4) {
         return this.onERC721Received.selector;
+    }
+
+    function _validateAgent(
+        address _caller,
+        bool _userFund,
+        address _token0,
+        address _token1,
+        uint24 _fee
+    ) internal view returns (bool) {
+        address _vault = msg.sender;
+        if (_caller == IUserVault(_vault).user()) {
+            return true;
+        }
+
+        if (_caller != IUserVault(_vault).agent()) {
+            return false;
+        }
+
+        // Agent should not use user fund or pool is not approved
+        if (_userFund || !_validatePool(_token0, _token1, _fee)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function _validatePool(
+        address _token0,
+        address _token1,
+        uint24 _fee
+    ) internal view returns (bool) {
+        bytes32 _poolKey = keccak256(abi.encodePacked(_token0, _token1, _fee));
+        return IUserVault(msg.sender).approvedAgentPools(_poolKey);
     }
 }

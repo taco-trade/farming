@@ -20,7 +20,7 @@ contract PancakeSwapV3Mint is
     address public positionManager;
 
     function initialize(
-        address _positionManager,
+        address _positionManager
     ) external initializer {
         OwnableUpgradeable.__Ownable_init(msg.sender);
         ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
@@ -38,14 +38,14 @@ contract PancakeSwapV3Mint is
         returns (uint8 posType, bytes memory posData)
     {
         (
-            address _fundSrc,
+            bool _userFund,
             INonfungiblePositionManager.MintParams memory _params
         ) = abi.decode(
                 _data,
-                (address, INonfungiblePositionManager.MintParams)
+                (bool, INonfungiblePositionManager.MintParams)
             );
 
-        if (!_validateAgent(_caller, _fundSrc, _params)) {
+        if (!_validateAgent(_caller, _userFund, _params)) {
             revert NotAuthorized();
         }
 
@@ -60,14 +60,25 @@ contract PancakeSwapV3Mint is
             _params.amount1Desired
         );
 
-        IUserVault(msg.sender).requestFundsFromUser(
-            _params.token0,
-            _params.amount0Desired
-        );
-        IUserVault(msg.sender).requestFundsFromUser(
-            _params.token1,
-            _params.amount1Desired
-        );
+        if (_userFund) {
+            IUserVault(msg.sender).requestFundsFromUser(
+                _params.token0,
+                _params.amount0Desired
+            );
+            IUserVault(msg.sender).requestFundsFromUser(
+                _params.token1,
+                _params.amount1Desired
+            );
+        } else {
+            IUserVault(msg.sender).requestFunds(
+                _params.token0,
+                _params.amount0Desired
+            );
+            IUserVault(msg.sender).requestFunds(
+                _params.token1,
+                _params.amount1Desired
+            );
+        }
 
         _params.recipient = msg.sender;
         _params.deadline = block.timestamp;
@@ -81,7 +92,8 @@ contract PancakeSwapV3Mint is
                 V3Position({
                     tokenId: tokenID,
                     token0: _params.token0,
-                    token1: _params.token1
+                    token1: _params.token1,
+                    fee: _params.fee
                 })
             )
         );
@@ -98,13 +110,13 @@ contract PancakeSwapV3Mint is
 
     /// @notice Validate the agent behavior
     /// @param _caller The caller address
-    /// @param _fundSrc The fund source address
+    /// @param _userFund The user fund flag
     /// @param _params The mint parameters
     /// @return True if the agent behavior is valid, false otherwise
     /// @dev If the caller is the agent, the fund source must be the vault and the pool must be approved
     function _validateAgent(
         address _caller,
-        address _fundSrc,
+        bool _userFund,
         INonfungiblePositionManager.MintParams memory _params
     ) internal view returns (bool) {
         address _vault = msg.sender;
@@ -116,7 +128,7 @@ contract PancakeSwapV3Mint is
             return false;
         }
 
-        if (_fundSrc != _vault || !_validatePool(_params)) {
+        if (_userFund || !_validatePool(_params)) {
             return false;
         }
         return true;
