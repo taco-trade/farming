@@ -67,12 +67,12 @@ contract Manager is IManager, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     /// @param _strategy Strategy contract address
     /// @param _data     Custom data passed to the strategy
     function work(
+        address _vaultAddr,
         uint256 _positionID,
         address _strategy,
         bytes calldata _data
     ) external nonReentrant {
-        address vaultAddr = userVaults[msg.sender];
-        if (vaultAddr == address(0)) {
+        if (_vaultAddr == address(0)) {
             revert NoVault();
         }
 
@@ -80,13 +80,13 @@ contract Manager is IManager, OwnableUpgradeable, ReentrancyGuardUpgradeable {
         if (!approvedStrategies[_strategy]) revert StrategyNotWhitelisted();
 
         // 2. Check if the caller is the user themselves or the vault's agent
-        UserVault v = UserVault(vaultAddr);
-        address currentAgent = v.agent(); // the agent address recorded in the vault
-        if (msg.sender != msg.sender && msg.sender != currentAgent)
+        UserVault _v = UserVault(_vaultAddr);
+        address _currentAgent = _v.agent(); // the agent address recorded in the vault
+        if (msg.sender != _v.user() && msg.sender != _currentAgent)
             revert NotUserNorAgent();
 
-        // 3. Call the vault's managerWork to perform the actual operation
-        UserVault(vaultAddr).work(msg.sender, _positionID, _strategy, _data);
+        // 3. Call the vault's work to perform the actual operation
+        UserVault(_vaultAddr).work(msg.sender, _positionID, _strategy, _data);
     }
 
     /// @notice Allows a user to set their agent address in the manager

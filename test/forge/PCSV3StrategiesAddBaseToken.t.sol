@@ -100,7 +100,7 @@ contract PCSV3StrategiesAddBaseTokenTest is Test {
 
         uint256 nextPosId = userVault.nextPositionId();
         console.log(nextPosId);
-        manager.work(0, address(strategyAddBaseTokenOnly), abi.encode(params));
+        manager.work(address(userVault), 0, address(strategyAddBaseTokenOnly), abi.encode(params));
 
         Position memory pos = userVault.positions(nextPosId);
         uint256 tokenID = abi.decode(pos.data, (uint256));

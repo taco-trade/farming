@@ -94,8 +94,6 @@ contract UserVault is IUserVault, Initializable {
         address _strategy,
         bytes calldata _data
     ) external onlyOperator {
-        // call strategy
-        // note: strategy can call internal functions of this contract or interact with swap directly
         Position storage _pos;
         if (_positionID == 0) {
             _positionID = nextPositionId;
@@ -105,9 +103,16 @@ contract UserVault is IUserVault, Initializable {
             _pos = _positions[_positionID];
             if (_positionID >= nextPositionId) revert BadPositionID();
         }
+
         // Set the execution scope
         STRATEGY = _strategy;
         POSITION_ID = _positionID;
+
+        // If the agent or user calls this function directly,
+        // we need to set the caller to the agent or user manually.
+        if (msg.sender != manager) {
+            _caller = msg.sender;
+        }
 
         // Execute the strategy
         (uint8 posType, bytes memory posData) = IStrategy(_strategy).execute(

@@ -25,6 +25,7 @@ interface IManager {
     function setApprovedStrategies(address[] calldata strategies, bool allowed) external;
 
     function work(
+        address _vaultAddr,
         uint256 _positionID,
         address _strategy,
         bytes calldata _data
