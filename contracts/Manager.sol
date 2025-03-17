@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "./interfaces/IManager.sol";
-import "./UserVault.sol";
 
-contract Manager is IManager, OwnableUpgradeable {
+import "./interfaces/IManager.sol";
+import "./interfaces/IUserVaultFactory.sol";
+import {UserVault} from "./UserVault.sol";
+
+contract Manager is IManager, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     /// state variables
-    address public nftPositionManager;
+    address public userVaultFactory;
 
     /// @notice keccak256(token0, token1, fee) -> bool, indicates whether the pool is in the global whitelist
     mapping(bytes32 => bool) public poolWhiteList;
@@ -24,10 +27,11 @@ contract Manager is IManager, OwnableUpgradeable {
 
     function initialize(
         address _owner,
-        address _nftPositionManager
+        address _userVaultFactory
     ) external initializer {
+        ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
         OwnableUpgradeable.__Ownable_init(_owner);
-        nftPositionManager = _nftPositionManager;
+        userVaultFactory = _userVaultFactory;
     }
 
     /// @notice Admin function to set pool whitelist for token pairs
@@ -48,8 +52,7 @@ contract Manager is IManager, OwnableUpgradeable {
 
     function createUserVault() external {
         if (userVaults[msg.sender] != address(0)) revert VaultAlreadyExists();
-        address vaultAddr = _createUserVault(msg.sender);
-        userVaults[msg.sender] = vaultAddr;
+        _createUserVault(msg.sender);
     }
 
     /// @notice Executes unified operations on a pool position for a user;
@@ -62,7 +65,7 @@ contract Manager is IManager, OwnableUpgradeable {
         uint256 _positionID,
         address _strategy,
         bytes calldata _data
-    ) external {
+    ) external nonReentrant {
         address vaultAddr = userVaults[msg.sender];
         if (vaultAddr == address(0)) {
             revert NoVault();
@@ -102,7 +105,7 @@ contract Manager is IManager, OwnableUpgradeable {
     }
 
     /// @notice Collect tokens in this contract
-    function collect(address token, address recipient) external {
+    function collect(address token, address recipient) external nonReentrant {
         address vaultAddr = userVaults[msg.sender];
         if (vaultAddr == address(0)) revert NoVault();
         UserVault(vaultAddr).collect(token, recipient);
@@ -111,10 +114,10 @@ contract Manager is IManager, OwnableUpgradeable {
 
     /// @dev Internal function to create a UserVault for a user
     function _createUserVault(address _user) internal returns (address) {
-        UserVault vault = new UserVault(_user, address(this));
-        userVaults[_user] = address(vault);
-        emit CreateUserVault(_user, address(vault));
-        return address(vault);
+        address _vault = IUserVaultFactory(userVaultFactory).createUserVault(_user, address(this));
+        userVaults[_user] = address(_vault);
+        emit CreateUserVault(_user, address(_vault));
+        return address(_vault);
     }
 
     /// @dev Converts (token0, token1, fee) into a key

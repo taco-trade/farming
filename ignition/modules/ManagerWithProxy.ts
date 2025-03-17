@@ -3,11 +3,15 @@ import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 const ManagerProxyModule = buildModule("ManagerProxyModule", (m) => {
   const proxyAdminOwner = m.getAccount(0);
 
-  // Deploy the manager contract
+  // Deploy UserVault implementation
+  const userVaultImpl = m.contract("UserVault");
+  // Deploy UserVaultFactory
+  const userVaultFactory = m.contract("UserVaultFactory", [userVaultImpl, proxyAdminOwner]);
+  // Deploy Manager
   const manager = m.contract("Manager");
-
+ 
   // Encode the initialize function call
-  const initializeCall = m.encodeFunctionCall(manager, "initialize", [proxyAdminOwner, m.getParameter("positionManager")]);
+  const initializeCall = m.encodeFunctionCall(manager, "initialize", [proxyAdminOwner, m.getParameter("positionManager"), userVaultFactory]);
 
   // Deploy the proxy contract with the manager contract as the implementation
   const proxy = m.contract("TransparentUpgradeableProxy", [
@@ -20,7 +24,7 @@ const ManagerProxyModule = buildModule("ManagerProxyModule", (m) => {
   const proxyAdminAddress = m.readEventArgument(proxy, "AdminChanged", "newAdmin");
   const proxyAdmin = m.contractAt("ProxyAdmin", proxyAdminAddress);
 
-  return { proxyAdmin, proxy }
+  return { proxyAdmin, proxy, userVaultFactory }
 });
 
 export default ManagerProxyModule;

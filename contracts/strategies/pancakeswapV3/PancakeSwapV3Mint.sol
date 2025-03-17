@@ -4,18 +4,20 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import {INonfungiblePositionManager} from "../../interfaces/pancakeswapV3/periphery/INonfungiblePositionManager.sol";
 import {IStrategy} from "../../interfaces/IStrategy.sol";
 import {IUserVault} from "../../interfaces/IUserVault.sol";
 
-contract PancakeSwapV3Mint is IStrategy, IERC721Receiver, OwnableUpgradeable {
+contract PancakeSwapV3Mint is IStrategy, IERC721Receiver, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     address public positionManager;
 
     function initialize(
         address _positionManager
     ) external initializer {
         OwnableUpgradeable.__Ownable_init(msg.sender);
+        ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
         positionManager = _positionManager;
     }
 
@@ -23,7 +25,7 @@ contract PancakeSwapV3Mint is IStrategy, IERC721Receiver, OwnableUpgradeable {
         address /* _caller */,
         uint256 /* _positionID */,
         bytes calldata _data
-    ) external override returns (uint8 posType, bytes memory posData) {
+    ) external override nonReentrant returns (uint8 posType, bytes memory posData) {
         INonfungiblePositionManager.MintParams memory params = abi.decode(
             _data,
             (INonfungiblePositionManager.MintParams)

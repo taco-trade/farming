@@ -4,14 +4,16 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 import "./interfaces/IStrategy.sol";
 import "./interfaces/pancakeswapV3/periphery/INonfungiblePositionManager.sol";
 import {Position, IUserVault} from "./interfaces/IUserVault.sol";
 
-contract UserVault is IUserVault {
-    address public immutable user;
-    address public immutable manager;
+contract UserVault is IUserVault, Initializable {
+    address public user;
+    address public manager;
     address private _agent;
 
     mapping(bytes32 => bool) public agentPoolAllowList;
@@ -52,7 +54,7 @@ contract UserVault is IUserVault {
         _IN_EXEC_LOCK = _NOT_ENTERED;
     }
 
-    constructor(address _user, address _manager) {
+    function initialize(address _user, address _manager) external initializer {
         user = _user;
         manager = _manager;
         nextPositionId = 1;
