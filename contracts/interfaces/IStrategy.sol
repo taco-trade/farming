@@ -12,6 +12,8 @@ interface IStrategy {
         address token1;
     }
 
+    error NotAuthorized();
+
     /**
      * @notice Called by UserVault in managerWork(...) to delegate actual operation logic to strategy
      * @param caller   The caller address, user or agent.

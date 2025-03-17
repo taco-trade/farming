@@ -6,15 +6,21 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
+import {IManager} from "../../interfaces/IManager.sol";
 import {INonfungiblePositionManager} from "../../interfaces/pancakeswapV3/periphery/INonfungiblePositionManager.sol";
 import {IStrategy} from "../../interfaces/IStrategy.sol";
 import {IUserVault} from "../../interfaces/IUserVault.sol";
 
-contract PancakeSwapV3Mint is IStrategy, IERC721Receiver, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract PancakeSwapV3Mint is
+    IStrategy,
+    IERC721Receiver,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable
+{
     address public positionManager;
 
     function initialize(
-        address _positionManager
+        address _positionManager,
     ) external initializer {
         OwnableUpgradeable.__Ownable_init(msg.sender);
         ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
@@ -22,48 +28,60 @@ contract PancakeSwapV3Mint is IStrategy, IERC721Receiver, OwnableUpgradeable, Re
     }
 
     function execute(
-        address /* _caller */,
+        address _caller,
         uint256 /* _positionID */,
         bytes calldata _data
-    ) external override nonReentrant returns (uint8 posType, bytes memory posData) {
-        INonfungiblePositionManager.MintParams memory params = abi.decode(
-            _data,
-            (INonfungiblePositionManager.MintParams)
-        );
+    )
+        external
+        override
+        nonReentrant
+        returns (uint8 posType, bytes memory posData)
+    {
+        (
+            address _fundSrc,
+            INonfungiblePositionManager.MintParams memory _params
+        ) = abi.decode(
+                _data,
+                (address, INonfungiblePositionManager.MintParams)
+            );
+
+        if (!_validateAgent(_caller, _fundSrc, _params)) {
+            revert NotAuthorized();
+        }
 
         SafeERC20.safeIncreaseAllowance(
-            IERC20(params.token0),
+            IERC20(_params.token0),
             positionManager,
-            params.amount0Desired
+            _params.amount0Desired
         );
         SafeERC20.safeIncreaseAllowance(
-            IERC20(params.token1),
+            IERC20(_params.token1),
             positionManager,
-            params.amount1Desired
+            _params.amount1Desired
         );
 
         IUserVault(msg.sender).requestFundsFromUser(
-            params.token0,
-            params.amount0Desired
+            _params.token0,
+            _params.amount0Desired
         );
         IUserVault(msg.sender).requestFundsFromUser(
-            params.token1,
-            params.amount1Desired
+            _params.token1,
+            _params.amount1Desired
         );
 
-        params.recipient = msg.sender;
-        params.deadline = block.timestamp;
+        _params.recipient = msg.sender;
+        _params.deadline = block.timestamp;
 
         (uint256 tokenID, , , ) = INonfungiblePositionManager(positionManager)
-            .mint(params);
+            .mint(_params);
 
         return (
             uint8(PositionType.V3_LP),
             abi.encode(
                 V3Position({
                     tokenId: tokenID,
-                    token0: params.token0,
-                    token1: params.token1
+                    token0: _params.token0,
+                    token1: _params.token1
                 })
             )
         );
@@ -76,5 +94,40 @@ contract PancakeSwapV3Mint is IStrategy, IERC721Receiver, OwnableUpgradeable, Re
         bytes calldata /* data */
     ) external pure override returns (bytes4) {
         return this.onERC721Received.selector;
+    }
+
+    /// @notice Validate the agent behavior
+    /// @param _caller The caller address
+    /// @param _fundSrc The fund source address
+    /// @param _params The mint parameters
+    /// @return True if the agent behavior is valid, false otherwise
+    /// @dev If the caller is the agent, the fund source must be the vault and the pool must be approved
+    function _validateAgent(
+        address _caller,
+        address _fundSrc,
+        INonfungiblePositionManager.MintParams memory _params
+    ) internal view returns (bool) {
+        address _vault = msg.sender;
+        if (_caller == IUserVault(_vault).user()) {
+            return true;
+        }
+
+        if (_caller != IUserVault(_vault).agent()) {
+            return false;
+        }
+
+        if (_fundSrc != _vault || !_validatePool(_params)) {
+            return false;
+        }
+        return true;
+    }
+
+    function _validatePool(
+        INonfungiblePositionManager.MintParams memory _params
+    ) internal view returns (bool) {
+        bytes32 _poolKey = keccak256(
+            abi.encodePacked(_params.token0, _params.token1, _params.fee)
+        );
+        return IUserVault(msg.sender).approvedAgentPools(_poolKey);
     }
 }
