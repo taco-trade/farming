@@ -17,11 +17,9 @@ interface IManager {
 
     function setApprovedPools(bytes32[] calldata pools, bool allowed) external;
 
-    function updateAgentAllowedPool(
-        address token0,
-        address token1,
-        uint24 fee,
-        bool allowed
+    function setApprovedAgentPools(
+        bytes32[] calldata _poolKeys,
+        bool _allowed
     ) external;
 
     function setApprovedStrategies(address[] calldata strategies, bool allowed) external;

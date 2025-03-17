@@ -90,26 +90,30 @@ contract Manager is IManager, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     }
 
     /// @notice Allows a user to set their agent address in the manager
-    /// @param newAgent New agent address
-    function setAgent(address newAgent) external {
+    /// @param _newAgent New agent address
+    function setAgent(address _newAgent) external {
         address vaultAddr = userVaults[msg.sender];
         if (vaultAddr == address(0)) revert NoVault();
-        UserVault(vaultAddr).setAgent(msg.sender, newAgent);
+        UserVault(vaultAddr).setAgent(_newAgent);
     }
 
     /// @notice Allows a user to update their agent's allowed pools whitelist (specific to this user only)
-    function updateAgentAllowedPool(
-        address token0,
-        address token1,
-        uint24 fee,
-        bool allowed
+    /// @param _poolKeys The pool keys to update, must be in the global whitelist.
+    ///     Key is the result of the keccak256(abi.encodePacked(address0, address1, fee)) function.
+    /// @param _allowed Whether the pools are allowed
+    function setApprovedAgentPools(
+        bytes32[] calldata _poolKeys,
+        bool _allowed
     ) external {
         address vaultAddr = userVaults[msg.sender];
         if (vaultAddr == address(0)) revert NoVault();
-        bytes32 key = _getPoolKey(token0, token1, fee);
-        if (!approvedPools[key]) revert PoolNotInGlobalWhitelist();
 
-        UserVault(vaultAddr).updateAgentAllowedPool(msg.sender, key, allowed);
+        for (uint256 i = 0; i < _poolKeys.length; i++) {
+            bytes32 key = _poolKeys[i];
+            if (!approvedPools[key]) revert PoolNotInGlobalWhitelist();
+        }
+
+        UserVault(vaultAddr).setApprovedAgentPools(_poolKeys, _allowed);
     }
 
     /// @notice Collect tokens in this contract

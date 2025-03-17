@@ -16,7 +16,7 @@ contract UserVault is IUserVault, Initializable {
     address public manager;
     address private _agent;
 
-    mapping(bytes32 => bool) public agentPoolAllowList;
+    mapping(bytes32 => bool) public approvedAgentPools;
     mapping(uint256 => Position) private _positions;
     uint256 public nextPositionId;
 
@@ -39,9 +39,16 @@ contract UserVault is IUserVault, Initializable {
     error NotUser();
     error NotInExec();
     error BadPositionID();
+    error NotOperator();
+
+    modifier onlyOperator() {
+        if (msg.sender != manager && msg.sender != user && msg.sender != _agent)
+            revert NotOperator();
+        _;
+    }
 
     modifier onlyManager() {
-        if (msg.sender != manager) revert OnlyManager();
+        if (msg.sender != manager && msg.sender != user) revert OnlyManager();
         _;
     }
 
@@ -70,8 +77,10 @@ contract UserVault is IUserVault, Initializable {
     }
 
     /// @notice Returns the position data for a given position ID
-    function positions(uint256 positionId) external view returns (Position memory) {
-        return _positions[positionId];
+    function positions(
+        uint256 _positionId
+    ) external view returns (Position memory) {
+        return _positions[_positionId];
     }
 
     // ---------------- only manager can call functions ----------------- //
@@ -84,7 +93,7 @@ contract UserVault is IUserVault, Initializable {
         uint256 _positionID,
         address _strategy,
         bytes calldata _data
-    ) external onlyManager {
+    ) external onlyOperator {
         // call strategy
         // note: strategy can call internal functions of this contract or interact with swap directly
         Position storage _pos;
@@ -101,7 +110,11 @@ contract UserVault is IUserVault, Initializable {
         POSITION_ID = _positionID;
 
         // Execute the strategy
-        (uint8 posType, bytes memory posData) = IStrategy(_strategy).execute(_caller, _positionID, _data);
+        (uint8 posType, bytes memory posData) = IStrategy(_strategy).execute(
+            _caller,
+            _positionID,
+            _data
+        );
         _pos.posType = posType;
         _pos.data = posData;
 
@@ -113,27 +126,30 @@ contract UserVault is IUserVault, Initializable {
     }
 
     /// @notice Manager.setAgent(...) called
-    function setAgent(address caller, address newAgent) external onlyManager {
-        if (caller != user) revert NotUser();
-        address old = _agent;
-        _agent = newAgent;
-        emit SetAgent(old, newAgent);
+    function setAgent(address _newAgent) external onlyManager {
+        address _oldAgent = _agent;
+        _agent = _newAgent;
+        emit SetAgent(_oldAgent, _newAgent);
     }
 
-    /// @notice Manager.updateAgentAllowedPool(...) called
-    function updateAgentAllowedPool(
-        address caller,
-        bytes32 poolKey,
-        bool allowed
+    /// @notice Manager.setApprovedAgentPools(...) called
+    function setApprovedAgentPools(
+        bytes32[] calldata _poolKeys,
+        bool _allowed
     ) external onlyManager {
-        if (caller != user) revert NotUser();
-        agentPoolAllowList[poolKey] = allowed;
-        emit UpdateAgentPool(poolKey, allowed);
+        for (uint256 i = 0; i < _poolKeys.length; i++) {
+            approvedAgentPools[_poolKeys[i]] = _allowed;
+            emit UpdateAgentPool(_poolKeys[i], _allowed);
+        }
     }
 
     /// @notice Collect tokens in this contract
-    function collect(address token, address recipient) external onlyManager {
-        SafeERC20.safeTransfer(IERC20(token), recipient, IERC20(token).balanceOf(address(this)));
+    function collect(address _token, address _recipient) external onlyOperator {
+        SafeERC20.safeTransfer(
+            IERC20(_token),
+            _recipient,
+            IERC20(_token).balanceOf(address(this))
+        );
     }
 
     // ---------------- only strategy in exec scope can call functions ----------------- //
@@ -166,7 +182,11 @@ contract UserVault is IUserVault, Initializable {
         address targetedERC721,
         uint256 tokenId
     ) external inExec {
-        IERC721(targetedERC721).safeTransferFrom(address(this), msg.sender, tokenId);
+        IERC721(targetedERC721).safeTransferFrom(
+            address(this),
+            msg.sender,
+            tokenId
+        );
     }
 
     // ---------------- IERC721Receiver ------------------ //

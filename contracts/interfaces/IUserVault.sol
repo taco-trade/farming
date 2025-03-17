@@ -21,7 +21,7 @@ interface IUserVault is IERC721Receiver {
     function user() external view returns (address);
     function manager() external view returns (address);
     function agent() external view returns (address);
-    function agentPoolAllowList(bytes32) external view returns (bool);
+    function approvedAgentPools(bytes32) external view returns (bool);
     function positions(uint256) external view returns (Position memory);
 
     // State-Changing Functions
@@ -32,20 +32,19 @@ interface IUserVault is IERC721Receiver {
         bytes calldata _data
     ) external;
 
-    function setAgent(address caller, address newAgent) external;
+    function setAgent(address _newAgent) external;
 
-    function updateAgentAllowedPool(
-        address caller,
-        bytes32 poolKey,
-        bool allowed
+    function setApprovedAgentPools(
+        bytes32[] calldata _poolKeys,
+        bool _allowed
     ) external;
 
     /// @notice Collect tokens in this contract
-    function collect(address token, address recipient) external;
+    function collect(address _token, address _recipient) external;
 
-    function requestFundsFromUser(address token, uint256 amount) external;
+    function requestFundsFromUser(address _token, uint256 _amount) external;
 
-    function requestFunds(address token, uint256 amount) external;
+    function requestFunds(address _token, uint256 _amount) external;
 
-    function requestERC721(address targetedERC721, uint256 tokenId) external;
+    function requestERC721(address _targetedERC721, uint256 _tokenId) external;
 }
