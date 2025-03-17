@@ -35,8 +35,6 @@ contract PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate is
     address public router;
     address public positionManager;
 
-    mapping(address => bool) public okVaults;
-
     event PCSV3AddBaseTokenOnly(
         uint256 indexed tokenID,
         address indexed baseToken,
@@ -44,14 +42,6 @@ contract PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate is
         uint256 baseTokenAmount,
         uint256 farmingTokenAmount
     );
-
-    modifier onlyWhitelistedVaults() {
-        require(
-            okVaults[msg.sender],
-            "PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate::onlyWhitelistedVaults:: bad vault"
-        );
-        _;
-    }
 
     function initialize(
         address _factory,
@@ -74,7 +64,6 @@ contract PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate is
     )
         external
         override
-        onlyWhitelistedVaults
         returns (uint8 posType, bytes memory posData)
     {
         StrategyAddBaseTokenOnlyWithCalculateParam memory params = abi.decode(
@@ -172,15 +161,6 @@ contract PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate is
             token0: params.baseToken,
             token1: params.farmingToken
         })));
-    }
-
-    function setVaultsOk(
-        address[] calldata vaults,
-        bool isOk
-    ) external onlyOwner {
-        for (uint256 idx = 0; idx < vaults.length; idx++) {
-            okVaults[vaults[idx]] = isOk;
-        }
     }
 
     function onERC721Received(

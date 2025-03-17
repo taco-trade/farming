@@ -67,7 +67,6 @@ contract PCSV3StrategiesAddBaseTokenTest is Test {
         vm.startPrank(strategyAddBaseTokenOnly.owner());
         address[] memory vaults = new address[](1);
         vaults[0] = manager.userVaults(user);
-        strategyAddBaseTokenOnly.setVaultsOk(vaults, true);
         vm.startPrank(user);
         return userVault;
     }
@@ -81,10 +80,6 @@ contract PCSV3StrategiesAddBaseTokenTest is Test {
         UserVault userVault = UserVault(creatUserValut(currentActor));
 
         console.log("userVault: ", address(userVault));
-        console.log(
-            "userVault is ok? ",
-            strategyAddBaseTokenOnly.okVaults(address(userVault))
-        );
 
         token0.approve(address(userVault), 100 ether);
         token1.approve(address(userVault), 100 ether);
