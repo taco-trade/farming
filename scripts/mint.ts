@@ -3,13 +3,19 @@ import { Manager__factory } from "../typechain-types";
 import { IERC20__factory } from "../typechain-types";
 import { getDeployedAddressByModule } from "./utils/address";
 
-const MODULE = "ManagerModule"
+const StrategiesMODULE = "StrategiesWithProxyModule"
+const ManagerMODULE = "ManagerProxyModule"
+const TokenMODULE = "MockTokenModule"
 
 async function main() {
   const [deployer] = await hre.ethers.getSigners();
   const chainId = hre.network.config.chainId!;
-  const managerAddr = getDeployedAddressByModule(MODULE, "Manager", chainId)
-  const strategyAddr = getDeployedAddressByModule(MODULE, "PancakeSwapV3Mint", chainId)
+
+  const managerAddr = getDeployedAddressByModule(ManagerMODULE, "TransparentUpgradeableProxy", chainId)
+  const StrategiesMintProxyAddr = getDeployedAddressByModule(StrategiesMODULE, "StrategiesMintProxy", chainId)
+  const token0Addr = getDeployedAddressByModule(TokenMODULE, "MockToken0", chainId)
+  const token1Addr = getDeployedAddressByModule(TokenMODULE, "MockToken1", chainId)
+
   const manager = Manager__factory.connect(managerAddr, deployer);
 
   var userVault = await manager.userVaults(deployer.address);
@@ -21,22 +27,22 @@ async function main() {
   userVault = await manager.userVaults(deployer.address);
   console.log("userVault:", userVault);
 
-  const token0 = IERC20__factory.connect("0x22D873Ce502a424c7909f1B950597b39F36b6608", deployer);
-  const token1 = IERC20__factory.connect("0xaB1a4d4f1D656d2450692D237fdD6C7f9146e814", deployer);
-  const tx0 = await token0.approve(userVault, hre.ethers.parseEther("100000"));
-  const tx1 = await token1.approve(userVault, hre.ethers.parseEther("100000"));
+  const token0 = IERC20__factory.connect(token0Addr, deployer);
+  const token1 = IERC20__factory.connect(token1Addr, deployer);
+  const tx0 = await token0.approve(userVault, hre.ethers.parseEther("1000"));
+  const tx1 = await token1.approve(userVault, hre.ethers.parseEther("1000"));
   console.log("approve:", tx0.hash, tx1.hash);
   await tx0.wait();
   await tx1.wait();
 
   const mintParams = {
-    token0: "0x22D873Ce502a424c7909f1B950597b39F36b6608",
-    token1: "0xaB1a4d4f1D656d2450692D237fdD6C7f9146e814",
-    fee: 2500,
-    tickLower: -46050,
-    tickUpper: 46050,
-    amount0Desired: hre.ethers.parseEther("10000"),
-    amount1Desired: hre.ethers.parseEther("10000"),
+    token0: token0Addr,
+    token1: token1Addr,
+    fee: 3000,
+    tickLower: -46020,
+    tickUpper: 46020,
+    amount0Desired: hre.ethers.parseEther("1000"),
+    amount1Desired: hre.ethers.parseEther("1000"),
     amount0Min: 0,
     amount1Min: 0,
     recipient: deployer.address,
@@ -49,7 +55,7 @@ async function main() {
     [mintParams]
   );
 
-  const workTx = await manager.work(0, strategyAddr, encodedParams, { gasLimit: 1000000 , gasPrice: hre.ethers.parseUnits("10", "gwei")});
+  const workTx = await manager.work(0, StrategiesMintProxyAddr, encodedParams, { gasLimit: 1000000 , gasPrice: hre.ethers.parseUnits("10", "gwei")});
   console.log("work:", workTx.hash);
   await workTx.wait();
 }
