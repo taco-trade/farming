@@ -16,10 +16,6 @@ contract MockToken is ERC20, Ownable {
         tokenDecimals = _decimals;
     }
 
-    function decimals() public view override returns (uint8) {
-        return _decimals;
-    }
-
     function mint(address account, uint256 amount) external {
         _mint(account, amount);
     }
