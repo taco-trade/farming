@@ -8,26 +8,29 @@ contract MockToken is
     ERC20Upgradeable,
     OwnableUpgradeable
 {
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
+    uint8 private _decimals;
 
     function initialize(
         string memory name,
         string memory symbol,
+        uint8 _customDecimals,
         uint256 initialSupply
     ) public initializer {
         __ERC20_init(name, symbol);
         __Ownable_init(msg.sender);
         _mint(msg.sender, initialSupply);
+        _decimals = _customDecimals;
     }
 
-    function mint(address account, uint256 amount) external onlyOwner {
+    function decimals() public view override returns (uint8) {
+        return _decimals;
+    }
+
+    function mint(address account, uint256 amount) external {
         _mint(account, amount);
     }
 
-    function burn(address account, uint256 amount) external onlyOwner {
+    function burn(address account, uint256 amount) external {
         _burn(account, amount);
     }
 }

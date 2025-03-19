@@ -1,4 +1,5 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
+import ManagerModule from "./Manager";
 
 
 const StrategiesModule = buildModule("StrategiesModule", (m) => {
@@ -15,6 +16,13 @@ const StrategiesModule = buildModule("StrategiesModule", (m) => {
   m.call(decreaseLiquidityStrategy, "initialize", [positionManager]);
   m.call(addBaseTokenOnlyStrategy, "initialize", [factory, router, positionManager]);
   m.call(addBaseTokenOnlyWithCalculateStrategy, "initialize", [factory, router, positionManager]);
+
+  const { manager } = m.useModule(ManagerModule);
+
+  m.call(manager, "setApprovedStrategies", [
+    [mintStrategy, decreaseLiquidityStrategy, addBaseTokenOnlyStrategy, addBaseTokenOnlyWithCalculateStrategy],
+    true
+  ])
 
   return { mintStrategy, decreaseLiquidityStrategy, addBaseTokenOnlyStrategy, addBaseTokenOnlyWithCalculateStrategy }
 });

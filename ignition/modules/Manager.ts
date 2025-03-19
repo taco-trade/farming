@@ -9,7 +9,7 @@ const ManagerModule = buildModule("ManagerModule", (m) => {
   // Deploy Manager
   const manager = m.contract("Manager");
   // Initialize Manager
-  m.call(manager, "initialize", [deployer, m.getParameter("positionManager"), userVaultFactory]);
+  m.call(manager, "initialize", [deployer, userVaultFactory]);
   return { manager }
 });
 
