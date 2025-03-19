@@ -11,7 +11,7 @@ const ManagerProxyModule = buildModule("ManagerProxyModule", (m) => {
   const manager = m.contract("Manager");
  
   // Encode the initialize function call
-  const initializeCall = m.encodeFunctionCall(manager, "initialize", [proxyAdminOwner, m.getParameter("positionManager"), userVaultFactory]);
+  const initializeCall = m.encodeFunctionCall(manager, "initialize", [proxyAdminOwner, userVaultFactory]);
 
   // Deploy the proxy contract with the manager contract as the implementation
   const proxy = m.contract("TransparentUpgradeableProxy", [
