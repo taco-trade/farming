@@ -9,7 +9,6 @@ import {IUserVault} from "../../interfaces/IUserVault.sol";
 import {ISwapRouter} from "../../interfaces/pancakeswapV3/periphery/ISwapRouter.sol";
 import {INonfungiblePositionManager} from "../../interfaces/pancakeswapV3/periphery/INonfungiblePositionManager.sol";
 
-
 struct StrategyAddBaseTokenOnlyParam {
     address baseToken;
     address farmingToken;
@@ -31,8 +30,6 @@ contract PancakeswapV3StrategyAddBaseTokenOnly is
     address public router;
     address public positionManager;
 
-    mapping(address => bool) public okVaults;
-
     event PCSV3AddBaseTokenOnly(
         uint256 indexed tokenID,
         address indexed baseToken,
@@ -40,14 +37,6 @@ contract PancakeswapV3StrategyAddBaseTokenOnly is
         uint256 baseTokenAmount,
         uint256 farmingTokenAmount
     );
-
-    modifier onlyWhitelistedVaults() {
-        require(
-            okVaults[msg.sender],
-            "PancakeswapV3StrategyAddBaseTokenOnly::onlyWhitelistedVaults:: bad vault"
-        );
-        _;
-    }
 
     function initialize(
         address _factory,
@@ -64,19 +53,12 @@ contract PancakeswapV3StrategyAddBaseTokenOnly is
     /// @dev Execute strategy. Take BaseToken. Return LP tokens.
     /// @param data Extra calldata information passed along to this strategy.
     function execute(
-        address /* user */,
+        address _caller,
         uint256 /* positionID */,
         bytes calldata data
-    )
-        external
-        override
-        onlyWhitelistedVaults
-        returns (uint8 posType, bytes memory posData)
-    {
-        StrategyAddBaseTokenOnlyParam memory params = abi.decode(
-            data,
-            (StrategyAddBaseTokenOnlyParam)
-        );
+    ) external override returns (uint8 posType, bytes memory posData) {
+        (bool _userFund, StrategyAddBaseTokenOnlyParam memory params) = abi
+            .decode(data, (bool, StrategyAddBaseTokenOnlyParam));
 
         require(
             params.baseToken != address(0),
@@ -87,7 +69,29 @@ contract PancakeswapV3StrategyAddBaseTokenOnly is
             "PancakeswapV3StrategyAddBaseTokenOnly::execute:: invalid farmingToken"
         );
 
-        IUserVault(msg.sender).requestFundsFromUser(params.baseToken, params.totalAmount);
+        if (
+            !_validateAgent(
+                _caller,
+                _userFund,
+                params.baseToken,
+                params.farmingToken,
+                params.fee
+            )
+        ) {
+            revert NotAuthorized();
+        }
+
+        if (_userFund) {
+            IUserVault(msg.sender).requestFundsFromUser(
+                params.baseToken,
+                params.totalAmount
+            );
+        } else {
+            IUserVault(msg.sender).requestFunds(
+                params.baseToken,
+                params.totalAmount
+            );
+        }
 
         // uint256 balance = IERC20(params.baseToken).balanceOf(msg.sender);
         // require(
@@ -107,8 +111,6 @@ contract PancakeswapV3StrategyAddBaseTokenOnly is
         // L = input / (Px + Py)
         // x = L * Px
         // y = input - x = L * Py
-
-
 
         SafeERC20.safeIncreaseAllowance(
             IERC20(params.baseToken),
@@ -142,8 +144,6 @@ contract PancakeswapV3StrategyAddBaseTokenOnly is
                 block.timestamp
             );
 
-        
-
         SafeERC20.safeIncreaseAllowance(
             IERC20(mintParams.token0),
             positionManager,
@@ -165,19 +165,49 @@ contract PancakeswapV3StrategyAddBaseTokenOnly is
             baseAmount,
             farmingAmount
         );
-        return (uint8(PositionType.V3_LP), abi.encode(V3Position({
-            tokenId: tokenID,
-            token0: params.baseToken,
-            token1: params.farmingToken
-        })));
+        return (
+            uint8(PositionType.V3_LP),
+            abi.encode(
+                V3Position({
+                    tokenId: tokenID,
+                    token0: params.baseToken,
+                    token1: params.farmingToken,
+                    fee: params.fee
+                })
+            )
+        );
     }
 
-    function setVaultsOk(
-        address[] calldata vaults,
-        bool isOk
-    ) external onlyOwner {
-        for (uint256 idx = 0; idx < vaults.length; idx++) {
-            okVaults[vaults[idx]] = isOk;
+    function _validateAgent(
+        address _caller,
+        bool _userFund,
+        address _token0,
+        address _token1,
+        uint24 _fee
+    ) internal view returns (bool) {
+        address _vault = msg.sender;
+        if (_caller == IUserVault(_vault).user()) {
+            return true;
         }
+
+        if (_caller != IUserVault(_vault).agent()) {
+            return false;
+        }
+
+        // Agent should not use user fund or pool is not approved
+        if (_userFund || !_validatePool(_token0, _token1, _fee)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function _validatePool(
+        address _token0,
+        address _token1,
+        uint24 _fee
+    ) internal view returns (bool) {
+        bytes32 _poolKey = keccak256(abi.encodePacked(_token0, _token1, _fee));
+        return IUserVault(msg.sender).approvedAgentPools(_poolKey);
     }
 }

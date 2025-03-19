@@ -10,7 +10,10 @@ interface IStrategy {
         uint256 tokenId;
         address token0;
         address token1;
+        uint24 fee;
     }
+
+    error NotAuthorized();
 
     /**
      * @notice Called by UserVault in managerWork(...) to delegate actual operation logic to strategy

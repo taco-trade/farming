@@ -32,7 +32,7 @@ contract PancakeSwapV3DecreaseLiquidity is IStrategy, OwnableUpgradeable {
     }
 
     function execute(
-        address /* _caller */,
+        address _caller,
         uint256 _positionID,
         bytes calldata _data
     ) external override returns (uint8 posType, bytes memory posData) {
@@ -50,11 +50,19 @@ contract PancakeSwapV3DecreaseLiquidity is IStrategy, OwnableUpgradeable {
             ? msg.sender
             : IUserVault(msg.sender).user();
 
+        if (!_validateAgent(_caller, recipient, _v3Position)) {
+            revert NotAuthorized();
+        }
+
         // Handle liquidity decrease and token collection
         _decreaseLiquidityAndCollect(_v3Position.tokenId, _params, recipient);
 
         // Handle token transfers
-        _handleTokenTransfers(recipient, _v3Position.token0, _v3Position.token1);
+        _handleTokenTransfers(
+            recipient,
+            _v3Position.token0,
+            _v3Position.token1
+        );
 
         return (
             uint8(PositionType.V3_LP),
@@ -62,7 +70,8 @@ contract PancakeSwapV3DecreaseLiquidity is IStrategy, OwnableUpgradeable {
                 V3Position({
                     tokenId: _v3Position.tokenId,
                     token0: _v3Position.token0,
-                    token1: _v3Position.token1
+                    token1: _v3Position.token1,
+                    fee: _v3Position.fee
                 })
             )
         );
@@ -98,7 +107,11 @@ contract PancakeSwapV3DecreaseLiquidity is IStrategy, OwnableUpgradeable {
         );
 
         // Transfer the NFT back to the UserVault
-        IERC721(positionManager).safeTransferFrom(address(this), msg.sender, _tokenId);
+        IERC721(positionManager).safeTransferFrom(
+            address(this),
+            msg.sender,
+            _tokenId
+        );
     }
 
     function _handleTokenTransfers(
@@ -126,5 +139,50 @@ contract PancakeSwapV3DecreaseLiquidity is IStrategy, OwnableUpgradeable {
     ) external pure returns (bytes4) {
         return IERC721Receiver.onERC721Received.selector;
     }
-    
+
+    /// @notice Validate the agent behavior
+    /// @param _caller The caller address
+    /// @param _recipient The recipient address
+    /// @param _v3Position The V3 position
+    /// @return True if the agent behavior is valid, false otherwise
+    /// @dev If the caller is the agent, the recipient must be the vault
+    function _validateAgent(
+        address _caller,
+        address _recipient,
+        V3Position memory _v3Position
+    ) internal view returns (bool) {
+        address _vault = msg.sender;
+        if (_caller == IUserVault(_vault).user()) {
+            return true;
+        }
+        if (_caller != IUserVault(_vault).agent()) {
+            return false;
+        }
+
+        // If the caller is the agent, the recipient must be the vault
+        if (_recipient != _vault) {
+            return false;
+        }
+
+        if (
+            !_validatePool(
+                _v3Position.token0,
+                _v3Position.token1,
+                _v3Position.fee
+            )
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function _validatePool(
+        address _token0,
+        address _token1,
+        uint24 _fee
+    ) internal view returns (bool) {
+        bytes32 _poolKey = keccak256(abi.encodePacked(_token0, _token1, _fee));
+        return IUserVault(msg.sender).approvedAgentPools(_poolKey);
+    }
 }
