@@ -8,9 +8,11 @@ const BSC_TESTNET_RPC = vars.get("BSC_TESTNET_RPC");
 const BASE_SEPOLIA_RPC = vars.get("BASE_SEPOLIA_RPC");
 const SEPOLIA_RPC = vars.get("SEPOLIA_RPC");
 const PRIVATE_KEY = vars.get("PRIVATE_KEY");
+const PROD_PRIVATE_KEY = vars.get("PROD_PRIVATE_KEY");
 const BSC_SCAN_API_KEY = vars.get("BSC_SCAN_API_KEY");
 const BASE_SCAN_API_KEY = vars.get("BASE_SCAN_API_KEY");
 const ETH_SCAN_API_KEY = vars.get("ETH_SCAN_API_KEY");
+const BASE_RPC = vars.get("BASE_RPC");
 
 const config: HardhatUserConfig = {
   solidity: "0.8.28",
@@ -20,6 +22,11 @@ const config: HardhatUserConfig = {
         url: BSC_TESTNET_RPC,
         blockNumber: 48842800,
       },
+    },
+    base: {
+      url: BASE_RPC,
+      chainId: 8453,
+      accounts: [PROD_PRIVATE_KEY],
     },
     bscTestnet: {
       url: BSC_TESTNET_RPC,
@@ -42,6 +49,7 @@ const config: HardhatUserConfig = {
       bscTestnet: BSC_SCAN_API_KEY,
       baseSepolia: BASE_SCAN_API_KEY,
       sepolia: ETH_SCAN_API_KEY,
+      base: BASE_SCAN_API_KEY,
     },
     customChains: [
       {
@@ -52,6 +60,14 @@ const config: HardhatUserConfig = {
           browserURL: "https://sepolia.basescan.org", //
         },
       },
+      {
+        network: "base",
+        chainId: 8453,
+        urls: {
+          apiURL: "https://api.basescan.org/api",
+          browserURL: "https://basescan.org",
+        }
+      }
     ],
   }
 };

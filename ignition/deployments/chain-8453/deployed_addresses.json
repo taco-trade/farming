@@ -1,0 +1,17 @@
+{
+  "ManagerProxyModule#ManagerImpl": "0x1eEefFBE34d9e40c388D5BB54432EA9257185B26",
+  "ManagerProxyModule#UserVault": "0x060A02F85Ad7Bd9E422ca8E77aa529434b089aAD",
+  "ManagerProxyModule#UserVaultFactory": "0x1AF90f7AC5E2cE6387E379744bD13bce3cC703D8",
+  "ManagerProxyModule#TransparentUpgradeableProxy": "0x1ee5546f4BbCB5753cE0639cF6ECC8EB27E69687",
+  "ManagerProxyModule#Manager": "0x1ee5546f4BbCB5753cE0639cF6ECC8EB27E69687",
+  "ManagerProxyModule#ProxyAdmin": "0x3c9Ce01Da4548D546A69C6E13ef048B4F3B2d26a",
+  "StrategiesUniswapV3Module#UniswapV3DecreaseLiquidity": "0xCAc96b7fe996529743bbCf8a0309a7734d07DCfD",
+  "StrategiesUniswapV3Module#UniswapV3Mint": "0xa32DFeCA3f5635eb39D771BDaC37311e1E9C2Ac7",
+  "StrategiesUniswapV3Module#UniswapV3StrategyAddBaseTokenOnly": "0xDb5cFc599e4d32D1ac32436d4a2c9cf0b19b6F2C",
+  "StrategiesUniswapV3Module#StrategiesUniswapV3ABTProxy": "0x89cb589e6c410490eFe68A8BC381081A26AC1cc6",
+  "StrategiesUniswapV3Module#StrategiesUniswapV3DecProxy": "0xdfa65A6A87DD4b801D3aad5046342512E01b441C",
+  "StrategiesUniswapV3Module#StrategiesUniswapV3MintProxy": "0x69418f3853764487A7524c01DEe7657E78490e58",
+  "StrategiesUniswapV3Module#StrategiesUniswapV3ABTProxyAdmin": "0x40136797CB732E4b026f93A578285b29d84ba3b3",
+  "StrategiesUniswapV3Module#StrategiesUniswapV3DecProxyAdmin": "0x0F47f96d53f233752b8E3Fa9C3023E2f7feDcfdb",
+  "StrategiesUniswapV3Module#StrategiesUniswapV3MintProxyAdmin": "0x7fF88895ee85e59c5A4279A8Ac15C50b692CeBDA"
+}
