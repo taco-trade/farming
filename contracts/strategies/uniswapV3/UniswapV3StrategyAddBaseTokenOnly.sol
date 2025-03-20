@@ -183,6 +183,22 @@ contract UniswapV3StrategyAddBaseTokenOnly is
 
         (uint256 tokenID, , , ) = INonfungiblePositionManager(positionManager)
             .mint(mintParams);
+        
+        // There may be tokens left in this contract
+        // We should return them to the fund source
+        address refundAddr = _userFund
+            ? IUserVault(msg.sender).user()
+            : msg.sender;
+        SafeERC20.safeTransfer(
+            IERC20(params.baseToken),
+            refundAddr,
+            IERC20(params.baseToken).balanceOf(address(this))
+        );
+        SafeERC20.safeTransfer(
+            IERC20(params.farmingToken),
+            refundAddr,
+            IERC20(params.farmingToken).balanceOf(address(this))
+        );
 
         emit PCSV3AddBaseTokenOnly(
             tokenID,
@@ -191,6 +207,7 @@ contract UniswapV3StrategyAddBaseTokenOnly is
             baseAmount,
             farmingAmount
         );
+
         return (
             uint8(PositionType.V3_LP),
             abi.encode(

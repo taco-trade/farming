@@ -158,6 +158,20 @@ contract PancakeswapV3StrategyAddBaseTokenOnly is
         (uint256 tokenID, , , ) = INonfungiblePositionManager(positionManager)
             .mint(mintParams);
 
+        address refundAddr = _userFund
+            ? IUserVault(msg.sender).user()
+            : msg.sender;
+        SafeERC20.safeTransfer(
+            IERC20(params.baseToken),
+            refundAddr,
+            IERC20(params.baseToken).balanceOf(address(this))
+        );
+        SafeERC20.safeTransfer(
+            IERC20(params.farmingToken),
+            refundAddr,
+            IERC20(params.farmingToken).balanceOf(address(this))
+        );
+
         emit PCSV3AddBaseTokenOnly(
             tokenID,
             params.baseToken,

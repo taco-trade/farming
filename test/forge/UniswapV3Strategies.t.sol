@@ -11,7 +11,7 @@ import {Manager} from "../../contracts/Manager.sol";
 import {MockToken} from "../../contracts/test/MockToken.sol";
 import {UserVault} from "../../contracts/UserVault.sol";
 import {Position} from "../../contracts/interfaces/IUserVault.sol";
-import {StrategyAddBaseTokenOnlyWithCalculateParam, PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate} from "../../contracts/strategies/pancakeswapV3/PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate.sol";
+import {StrategyAddBaseTokenOnlyWithCalculateParam, UniswapV3StrategyAddBaseTokenOnly} from "../../contracts/strategies/uniswapV3/UniswapV3StrategyAddBaseTokenOnly.sol";
 import {UniswapV3BaseSepoliaConfig} from "./config/UniswapV3BaseSepoliaConfig.sol";
 import {EnvConfig} from "./config/EnvConfig.sol";
 import {TickMath} from "../../contracts/libraries/TickMath.sol";
@@ -20,7 +20,7 @@ contract UniswapV3StrategiesTest is Test {
     // Contracts
     Manager public manager;
     UserVaultFactory public userVaultFactory;
-    PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate
+    UniswapV3StrategyAddBaseTokenOnly
         public addBaseTokenOnlyWithCalculateStrategy;
 
     // Mock tokens
@@ -41,7 +41,7 @@ contract UniswapV3StrategiesTest is Test {
     function setUp() public {
         // Fork the Base Sepolia testnet
         string memory BASE_SEPOLIA_RPC = vm.envString("BASE_SEPOLIA_RPC");
-        uint256 baseSepoliaFork = vm.createFork(BASE_SEPOLIA_RPC);
+        uint256 baseSepoliaFork = vm.createFork(BASE_SEPOLIA_RPC, 23329343);
         vm.selectFork(baseSepoliaFork);
 
         // Setup accounts
@@ -73,7 +73,7 @@ contract UniswapV3StrategiesTest is Test {
         manager.initialize(deployer, address(userVaultFactory));
 
         // Deploy the strategy
-        addBaseTokenOnlyWithCalculateStrategy = new PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate();
+        addBaseTokenOnlyWithCalculateStrategy = new UniswapV3StrategyAddBaseTokenOnly();
 
         // Initialize strategy with real PancakeSwap V3 contracts
         addBaseTokenOnlyWithCalculateStrategy.initialize(
@@ -110,14 +110,81 @@ contract UniswapV3StrategiesTest is Test {
                 3000,
                 79228162514264337593543950336
             );
+
+        address lp = makeAddr("lp");
+        tokenA.mint(lp, 1000000 ether);
+        tokenB.mint(lp, 1000000 ether);
+        vm.startPrank(lp);
+        tokenA.approve(positionManager, type(uint256).max);
+        tokenB.approve(positionManager, type(uint256).max);
+        INonfungiblePositionManager(positionManager).mint(
+            INonfungiblePositionManager.MintParams({
+                token0: token0,
+                token1: token1,
+                fee: 3000,
+                tickLower: -46020,
+                tickUpper: 46020,
+                amount0Desired: 1000000 ether,
+                amount1Desired: 1000000 ether,
+                amount0Min: 0,
+                amount1Min: 0,
+                recipient: lp,
+                deadline: block.timestamp + 1000
+            })
+        );
+        vm.stopPrank();
     }
 
     function testAddBaseTokenOnly() public {
-        // Skip test if we're not on a fork
-        if (vm.activeFork() == 0) {
-            return;
+        // Use default parameters
+        uint256 amount = 100 ether;
+        int24 tickLower = -46080;
+        int24 tickUpper = 46080;
+
+        _testAddBaseTokenWithParams(amount, tickLower, tickUpper);
+    }
+
+    // forge-config: default.fuzz.runs = 200
+    function testAddBaseTokenOnlyFuzzed(
+        uint256 amount,
+        int24 tickLowerMultiplier,
+        int24 tickUpperMultiplier
+    ) public {
+        // Bound the input parameters to reasonable values
+        amount = bound(amount, 0.01 ether, 10000 ether);
+
+        // Keep ticks within reasonable ranges and ensure they're multiples of tickSpacing (60 for 3000 fee tier)
+        int24 tickSpacing = 60;
+        int24 minTick = -887220;  // Min tick for Uniswap V3
+        int24 maxTick = 887220;   // Max tick for Uniswap V3
+
+        // Bound multipliers to create valid tick ranges
+        tickLowerMultiplier = int24(bound(int24(tickLowerMultiplier), 1, 7000));
+        tickUpperMultiplier = int24(bound(int24(tickUpperMultiplier), 1, 7000));
+
+        // Calculate ticks ensuring they're multiples of tickSpacing
+        int24 tickLower = (minTick / tickSpacing + tickLowerMultiplier) * tickSpacing;
+        int24 tickUpper = (maxTick / tickSpacing - tickUpperMultiplier) * tickSpacing;
+
+        // Ensure tickLower < tickUpper
+        if (tickLower >= tickUpper) {
+            int24 temp = tickLower;
+            tickLower = tickUpper - tickSpacing * 10;  // Ensure at least some gap
+            tickUpper = temp + tickSpacing * 10;
         }
 
+        // Ensure we're within valid ranges
+        tickLower = tickLower < minTick ? minTick : tickLower;
+        tickUpper = tickUpper > maxTick ? maxTick : tickUpper;
+
+        _testAddBaseTokenWithParams(amount, tickLower, tickUpper);
+    }
+
+    function _testAddBaseTokenWithParams(
+        uint256 amount,
+        int24 tickLower,
+        int24 tickUpper
+    ) internal {
         // Switch to user perspective
         vm.startPrank(user);
 
@@ -140,10 +207,10 @@ contract UniswapV3StrategiesTest is Test {
             memory params = StrategyAddBaseTokenOnlyWithCalculateParam({
                 baseToken: baseToken,
                 farmingToken: farmingToken,
-                totalAmount:  777 ether,
+                totalAmount: amount,
                 fee: 3000,
-                tickLower: -46080,
-                tickUpper: 46080,
+                tickLower: tickLower,
+                tickUpper: tickUpper,
                 amount0Min: 0,
                 amount1Min: 0,
                 swapPath: abi.encodePacked(
@@ -171,8 +238,8 @@ contract UniswapV3StrategiesTest is Test {
         // Check position type
         assertEq(
             position.posType,
-            uint8(1),
-            "Position type should be 1 (V3_LP)"
+            uint8(0),
+            "Position type should be 0 (V3_LP)"
         );
 
         // Decode position data
@@ -192,12 +259,14 @@ contract UniswapV3StrategiesTest is Test {
         // Balance of the strategy should be 0
         assertEq(
             tokenA.balanceOf(address(addBaseTokenOnlyWithCalculateStrategy)),
-            0
+            0,
+            "Token A balance should be 0"
         );
 
         assertEq(
             tokenB.balanceOf(address(addBaseTokenOnlyWithCalculateStrategy)),
-            0
+            0,
+            "Token B balance should be 0"
         );
 
         vm.stopPrank();
