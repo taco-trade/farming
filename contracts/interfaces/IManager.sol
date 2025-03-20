@@ -13,7 +13,7 @@ interface IManager {
 
     function userVaults(address) external view returns (address);
 
-    function createUserVault() external;
+    function createUserVault(address _agent) external;
 
     function setApprovedPools(bytes32[] calldata pools, bool allowed) external;
 

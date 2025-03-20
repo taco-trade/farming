@@ -29,7 +29,7 @@ contract ManagerTest is Test {
     function testCreateVault() public {
         address sender = msg.sender;
         vm.startPrank(sender);
-        manager.createUserVault();
+        manager.createUserVault(address(0));
         address vaultAddress = manager.userVaults(sender);
         assertTrue(vaultAddress != address(0), "Vault creation failed");
     }
@@ -37,9 +37,9 @@ contract ManagerTest is Test {
     function testRecreateVault() public {
         address sender = msg.sender;
         vm.startPrank(sender);
-        manager.createUserVault();
+        manager.createUserVault(address(0));
 
         vm.expectRevert();
-        manager.createUserVault();
+        manager.createUserVault(address(0));
     }
 }

@@ -61,7 +61,7 @@ contract PCSV3StrategiesAddBaseTokenTest is Test {
         if (userVault != address(0)) {
             return userVault;
         }
-        manager.createUserVault();
+        manager.createUserVault(address(0));
         userVault = manager.userVaults(user);
 
         vm.startPrank(strategyAddBaseTokenOnly.owner());

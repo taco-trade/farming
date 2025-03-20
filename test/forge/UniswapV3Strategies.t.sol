@@ -191,7 +191,7 @@ contract UniswapV3StrategiesTest is Test {
         // Create user vault if not exists
         address userVault = manager.userVaults(user);
         if (userVault == address(0)) {
-            manager.createUserVault();
+            manager.createUserVault(address(0));
             userVault = manager.userVaults(user);
         }
 
