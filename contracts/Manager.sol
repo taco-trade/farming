@@ -47,9 +47,10 @@ contract Manager is IManager, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     }
 
     /// @notice Creates a new UserVault for a user
-    function createUserVault() external {
+    function createUserVault(address _agent) external {
         if (userVaults[msg.sender] != address(0)) revert VaultAlreadyExists();
-        _createUserVault(msg.sender);
+        address _vault = _createUserVault(msg.sender);
+        UserVault(_vault).setAgent(_agent);
     }
 
     /// @notice Admin function to set strategy whitelist

@@ -3,21 +3,22 @@ import { Manager__factory } from "../typechain-types";
 import { IERC20__factory } from "../typechain-types";
 import { getDeployedAddressByModule } from "./utils/address";
 
-const StrategiesMODULE = "StrategiesWithProxyModule"
-const ManagerMODULE = "ManagerProxyModule"
-const TokenMODULE = "MockTokenModule"
+const ManagerModule = "ManagerModule"
+const StrategyModule = "StrategiesModule"
+const TokenModule = "MockTokenModule"
 
 async function main() {
   const [deployer] = await hre.ethers.getSigners();
   const chainId = hre.network.config.chainId!;
 
-  const managerAddr = getDeployedAddressByModule(ManagerMODULE, "TransparentUpgradeableProxy", chainId)
-  const StrategiesMintProxyAddr = getDeployedAddressByModule(StrategiesMODULE, "StrategiesMintProxy", chainId)
-  const token0Addr = getDeployedAddressByModule(TokenMODULE, "MockToken0", chainId)
-  const token1Addr = getDeployedAddressByModule(TokenMODULE, "MockToken1", chainId)
+  const managerAddr = getDeployedAddressByModule(ManagerModule, "Manager", chainId)
+  const strategyAddr = getDeployedAddressByModule(StrategyModule, "PancakeSwapV3Mint", chainId)
+  const token0Addr = getDeployedAddressByModule(TokenModule, "MockToken0", chainId)
+  const token1Addr = getDeployedAddressByModule(TokenModule, "MockToken1", chainId)
 
   const manager = Manager__factory.connect(managerAddr, deployer);
 
+  // Init user vault
   var userVault = await manager.userVaults(deployer.address);
   if (userVault == hre.ethers.ZeroAddress) {
     const tx = await manager.createUserVault();
@@ -35,6 +36,7 @@ async function main() {
   await tx0.wait();
   await tx1.wait();
 
+  // Add liquidity
   const mintParams = {
     token0: token0Addr,
     token1: token1Addr,
@@ -48,14 +50,16 @@ async function main() {
     recipient: deployer.address,
     deadline: 0,
   };
+  // Encode strategy params
   const encodedParams = hre.ethers.AbiCoder.defaultAbiCoder().encode(
     [
+      'bool',
       'tuple(address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint256 amount0Desired, uint256 amount1Desired, uint256 amount0Min, uint256 amount1Min, address recipient, uint256 deadline)'
     ],
-    [mintParams]
+    [true, mintParams]
   );
 
-  const workTx = await manager.work(0, StrategiesMintProxyAddr, encodedParams, { gasLimit: 1000000 , gasPrice: hre.ethers.parseUnits("10", "gwei")});
+  const workTx = await manager.work(userVault, 0, strategyAddr, encodedParams, { gasLimit: 1000000 , gasPrice: hre.ethers.parseUnits("1", "gwei")});
   console.log("work:", workTx.hash);
   await workTx.wait();
 }

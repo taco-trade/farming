@@ -16,11 +16,11 @@ contract MockToken is ERC20, Ownable {
         tokenDecimals = _decimals;
     }
 
-    function mint(address account, uint256 amount) external onlyOwner {
+    function mint(address account, uint256 amount) external {
         _mint(account, amount);
     }
 
-    function burn(address account, uint256 amount) external onlyOwner {
+    function burn(address account, uint256 amount) external {
         _burn(account, amount);
     }
 
