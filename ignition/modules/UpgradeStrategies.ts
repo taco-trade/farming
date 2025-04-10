@@ -1,27 +1,20 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
-import StrategiesWithProxyModule from "./StrategiesWithProxy";
 
 
 const UpgradeStrategiesModule = buildModule("UpgradeStrategiesModule", (m) => {
     const proxyAdminOwner = m.getAccount(0);
+    const addBaseTokenOnlyWithCalculateStrategy = m.contract("UniswapV3StrategyAddBaseTokenOnly", [], {id: "UniswapV3StrategyAddBaseTokenOnly01"})
 
-    const { addBaseTokenOnlyWithCalculateProxyAdmin, addBaseTokenOnlyWithCalculateProxy } = m.useModule(StrategiesWithProxyModule)
+    // const addBaseTokenOnlyWithCalculateInit = m.encodeFunctionCall(addBaseTokenOnlyWithCalculateStrategy, "initialize", [factory, router, positionManager])
+    const proxyAdmin = m.contractAt("ProxyAdmin", "0x733b85D4CBA707d6C26A42fD75B85B6340f488e4")
+    const proxy = m.contractAt("TransparentUpgradeableProxy", "0x8cf8e17167F65Ae082399f80eD69472d0Ac28031")
 
-    const addBaseTokenOnlyWithCalculateStrategy = m.contract("PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate", [], {id: "addBaseTokenOnlyWithCalculateStrategyV2"})
-
-    // Get the parameters
-    const positionManager = m.getParameter("positionManager")
-    const factory = m.getParameter("factory")
-    const router = m.getParameter("router")
-
-    const addBaseTokenOnlyWithCalculateInit = m.encodeFunctionCall(addBaseTokenOnlyWithCalculateStrategy, "initialize", [factory, router, positionManager])
-
-    m.call(addBaseTokenOnlyWithCalculateProxyAdmin, "upgradeAndCall", [addBaseTokenOnlyWithCalculateProxy, addBaseTokenOnlyWithCalculateStrategy, addBaseTokenOnlyWithCalculateInit], {
+    m.call(proxyAdmin, "upgradeAndCall", [proxy, addBaseTokenOnlyWithCalculateStrategy, "0x"], {
         from: proxyAdminOwner,
     })
     
     // Return the proxies and the corresponding proxy admins
-    return { addBaseTokenOnlyWithCalculateProxy, addBaseTokenOnlyWithCalculateProxyAdmin }
+    return { proxyAdmin, proxy }
 });
 
 export default UpgradeStrategiesModule;

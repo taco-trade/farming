@@ -26,6 +26,15 @@ struct StrategyParams {
 contract UniswapV3DecreaseLiquidity is IStrategy, OwnableUpgradeable {
     address public positionManager;
 
+    event DecreaseLiquidity(
+        address indexed vault,
+        uint256 indexed positionID,
+        uint256 tokenID,
+        address token0,
+        address token1,
+        uint256 liquidity
+    );
+
     function initialize(address _positionManager) external initializer {
         OwnableUpgradeable.__Ownable_init(msg.sender);
         positionManager = _positionManager;
@@ -50,7 +59,7 @@ contract UniswapV3DecreaseLiquidity is IStrategy, OwnableUpgradeable {
             ? msg.sender
             : IUserVault(msg.sender).user();
 
-        if (!_validateAgent(_caller, recipient, _v3Position)) {
+        if (!_validateAgent(_caller, recipient)) {
             revert NotAuthorized();
         }
 
@@ -62,6 +71,15 @@ contract UniswapV3DecreaseLiquidity is IStrategy, OwnableUpgradeable {
             recipient,
             _v3Position.token0,
             _v3Position.token1
+        );
+
+        emit DecreaseLiquidity(
+            msg.sender,
+            _positionID,
+            _v3Position.tokenId,
+            _v3Position.token0,
+            _v3Position.token1,
+            _params.liquidity
         );
 
         return (
@@ -143,13 +161,11 @@ contract UniswapV3DecreaseLiquidity is IStrategy, OwnableUpgradeable {
     /// @notice Validate the agent behavior
     /// @param _caller The caller address
     /// @param _recipient The recipient address
-    /// @param _v3Position The V3 position
     /// @return True if the agent behavior is valid, false otherwise
     /// @dev If the caller is the agent, the recipient must be the vault
     function _validateAgent(
         address _caller,
-        address _recipient,
-        V3Position memory _v3Position
+        address _recipient
     ) internal view returns (bool) {
         address _vault = msg.sender;
         if (_caller == IUserVault(_vault).user()) {
@@ -164,25 +180,6 @@ contract UniswapV3DecreaseLiquidity is IStrategy, OwnableUpgradeable {
             return false;
         }
 
-        if (
-            !_validatePool(
-                _v3Position.token0,
-                _v3Position.token1,
-                _v3Position.fee
-            )
-        ) {
-            return false;
-        }
-
         return true;
-    }
-
-    function _validatePool(
-        address _token0,
-        address _token1,
-        uint24 _fee
-    ) internal view returns (bool) {
-        bytes32 _poolKey = keccak256(abi.encodePacked(_token0, _token1, _fee));
-        return IUserVault(msg.sender).approvedAgentPools(_poolKey);
     }
 }

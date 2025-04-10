@@ -1,29 +1,31 @@
 import hre from "hardhat";
 import { Manager__factory } from "../typechain-types";
+import { ZeroAddress } from "ethers";
 import { getDeployedAddressByModule } from "./utils/address";
 
-const MODULE = "ManagerModule"
+const ManagerModule = "ManagerProxyModule"
+const StrategyModule = "StrategiesUniswapV3Module"
 
 async function main() {
   const [deployer] = await hre.ethers.getSigners();
   const chainId = hre.network.config.chainId!;
-  const managerAddr = getDeployedAddressByModule(MODULE, "Manager", chainId)
-  const strategyAddr = getDeployedAddressByModule(MODULE, "PancakeSwapV3DecreaseLiquidity", chainId)
+  const managerAddr = getDeployedAddressByModule(ManagerModule, "Manager", chainId)
+  const strategyAddr = getDeployedAddressByModule(StrategyModule, "StrategiesUniswapV3DecProxy", chainId)
   const manager = Manager__factory.connect(managerAddr, deployer);
 
   const userVault = await manager.userVaults(deployer.address);
   if (userVault == hre.ethers.ZeroAddress) {
-    const tx = await manager.createUserVault();
+    const tx = await manager.createUserVault(ZeroAddress);
     console.log("createUserVault:", tx.hash);
     await tx.wait();
   }
   console.log("userVault:", userVault);
 
   const decreaseLiquidityParams = {
-    liquidity: "1111135831458991694216",
+    liquidity: "1000000000000",
     amount0Min: 0,
     amount1Min: 0,
-    recipient: 1,
+    recipient: 0,
   };
 
   const encodedParams = hre.ethers.AbiCoder.defaultAbiCoder().encode(
@@ -33,7 +35,7 @@ async function main() {
     [decreaseLiquidityParams]
   );
 
-  const workTx = await manager.work(2, strategyAddr, encodedParams, { gasLimit: 1000000, gasPrice: hre.ethers.parseUnits("10", "gwei") });
+  const workTx = await manager.work(userVault, 3, strategyAddr, encodedParams);
   console.log("work:", workTx.hash);
   await workTx.wait();
 }

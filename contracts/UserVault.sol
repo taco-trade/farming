@@ -163,9 +163,8 @@ contract UserVault is IUserVault, Initializable {
         address targetedToken,
         uint256 amount
     ) external inExec {
-        SafeERC20.safeTransferFrom(
+        SafeERC20.safeTransfer(
             IERC20(targetedToken),
-            address(this),
             msg.sender,
             amount
         );

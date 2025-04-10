@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {IStrategy} from "../../interfaces/IStrategy.sol";
-import {IUserVault} from "../../interfaces/IUserVault.sol";
+import {IUserVault, Position} from "../../interfaces/IUserVault.sol";
 import {IV3SwapRouter} from "../../interfaces/uniswapV3/periphery/IV3SwapRouter.sol";
 import {INonfungiblePositionManager} from "../../interfaces/uniswapV3/periphery/INonfungiblePositionManager.sol";
 import "../../libraries/LiqMath.sol";
@@ -35,12 +35,18 @@ contract UniswapV3StrategyAddBaseTokenOnly is
     address public router;
     address public positionManager;
 
-    event PCSV3AddBaseTokenOnly(
+    error PositionAlreadyExists();
+    error InvalidToken();
+
+    event Mint(
+        address indexed vault,
+        uint256 indexed positionID,
         uint256 indexed tokenID,
-        address indexed baseToken,
-        address indexed farmingToken,
-        uint256 baseTokenAmount,
-        uint256 farmingTokenAmount
+        address token0,
+        address token1,
+        uint128 liquidity,
+        uint256 token0Amount,
+        uint256 token1Amount
     );
 
     function initialize(
@@ -59,9 +65,10 @@ contract UniswapV3StrategyAddBaseTokenOnly is
     /// @param data Extra calldata information passed along to this strategy.
     function execute(
         address _caller,
-        uint256 /* positionID */,
+        uint256 _positionID,
         bytes calldata data
     ) external override returns (uint8 posType, bytes memory posData) {
+        // Decode parameters
         (
             bool _userFund,
             StrategyAddBaseTokenOnlyWithCalculateParam memory params
@@ -70,75 +77,195 @@ contract UniswapV3StrategyAddBaseTokenOnly is
                 (bool, StrategyAddBaseTokenOnlyWithCalculateParam)
             );
 
-        require(
-            params.baseToken != address(0),
-            "PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate::execute:: invalid baseToken"
-        );
-        require(
-            params.farmingToken != address(0),
-            "PancakeswapV3StrategyAddBaseTokenOnlyWithCalculate::execute:: invalid farmingToken"
+        // Validate paramas and agent's behavior
+        _validateParams(_caller, _userFund, _positionID, params);
+
+        // Request funds
+        _requestFunds(_userFund, params.baseToken, params.totalAmount);
+
+        (
+            uint256 tokenID,
+            uint128 liquidity,
+            uint256 token0Amount,
+            uint256 token1Amount,
+            address token0Addr,
+            address token1Addr
+        ) = _swapAndMint(params);
+
+        // There may be tokens left in this contract
+        _refundTokens(params.baseToken, params.farmingToken, _userFund);
+
+        emit Mint(
+            msg.sender,
+            _positionID,
+            tokenID,
+            token0Addr,
+            token1Addr,
+            liquidity,
+            token0Amount,
+            token1Amount
         );
 
-        if (
-            !_validateAgent(
-                _caller,
-                _userFund,
-                params.baseToken,
-                params.farmingToken,
-                params.fee
+        return (
+            uint8(PositionType.V3_LP),
+            abi.encode(
+                V3Position({
+                    tokenId: tokenID,
+                    token0: token0Addr,
+                    token1: token1Addr,
+                    fee: params.fee
+                })
             )
-        ) {
-            revert NotAuthorized();
-        }
+        );
+    }
 
+    function onERC721Received(
+        address /* operator */,
+        address /* from */,
+        uint256 /* tokenId */,
+        bytes calldata /* data */
+    ) external pure override returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
+
+    function _requestFunds(
+        bool _userFund,
+        address _baseToken,
+        uint256 _totalAmount
+    ) internal {
         if (_userFund) {
             IUserVault(msg.sender).requestFundsFromUser(
-                params.baseToken,
-                params.totalAmount
+                _baseToken,
+                _totalAmount
             );
         } else {
-            IUserVault(msg.sender).requestFunds(
-                params.baseToken,
-                params.totalAmount
-            );
+            IUserVault(msg.sender).requestFunds(_baseToken, _totalAmount);
+        }
+    }
+
+    function _refundTokens(
+        address baseToken,
+        address farmingToken,
+        bool userFund
+    ) internal {
+        address refundAddr = userFund
+            ? IUserVault(msg.sender).user()
+            : msg.sender;
+        SafeERC20.safeTransfer(
+            IERC20(baseToken),
+            refundAddr,
+            IERC20(baseToken).balanceOf(address(this))
+        );
+        SafeERC20.safeTransfer(
+            IERC20(farmingToken),
+            refundAddr,
+            IERC20(farmingToken).balanceOf(address(this))
+        );
+    }
+
+    function _validateAgent(
+        address _caller,
+        bool _userFund
+    ) internal view returns (bool) {
+        address _vault = msg.sender;
+        if (_caller == IUserVault(_vault).user()) {
+            return true;
         }
 
+        if (_caller != IUserVault(_vault).agent()) {
+            return false;
+        }
+
+        // Agent should not use user fund or pool is not approved
+        if (_userFund) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function _calculateSwapAmount(
+        address baseToken,
+        address farmingToken,
+        uint24 fee,
+        int24 tickLower,
+        int24 tickUpper,
+        uint256 totalAmount
+    )
+        internal
+        view
+        returns (uint256 swapAmount, address token0Addr, address token1Addr)
+    {
         address poolAddr = IUniswapV3Factory(factory).getPool(
-            params.baseToken,
-            params.farmingToken,
-            params.fee
+            baseToken,
+            farmingToken,
+            fee
         );
-        // todo: check poolAddr is zero
 
         // token1/token0
         (uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(poolAddr).slot0();
-        uint160 sqrtPriceLowerX96 = TickMath.getSqrtRatioAtTick(
-            params.tickLower
-        );
-        uint160 sqrtPriceUpperX96 = TickMath.getSqrtRatioAtTick(
-            params.tickUpper
-        );
+        uint160 sqrtPriceLowerX96 = TickMath.getSqrtRatioAtTick(tickLower);
+        uint160 sqrtPriceUpperX96 = TickMath.getSqrtRatioAtTick(tickUpper);
 
-        address token0Addr = IUniswapV3Pool(poolAddr).token0();
-        uint256 swapAmount;
-        address token1Addr;
-        if (params.baseToken == token0Addr) {
-            token1Addr = params.farmingToken;
+        token0Addr = IUniswapV3Pool(poolAddr).token0();
+        if (baseToken == token0Addr) {
+            token1Addr = farmingToken;
             swapAmount = LiqMath.getToken0SwapAmount(
                 sqrtPriceX96,
                 sqrtPriceLowerX96,
                 sqrtPriceUpperX96,
-                params.totalAmount
+                totalAmount
             );
         } else {
-            token1Addr = params.baseToken;
+            token1Addr = baseToken;
             swapAmount = LiqMath.getToken1SwapAmount(
                 sqrtPriceX96,
                 sqrtPriceLowerX96,
                 sqrtPriceUpperX96,
-                params.totalAmount
+                totalAmount
             );
         }
+    }
+
+    function _validateParams(
+        address _caller,
+        bool _userFund,
+        uint256 _positionID,
+        StrategyAddBaseTokenOnlyWithCalculateParam memory params
+    ) internal view {
+        Position memory _position = IUserVault(msg.sender).positions(
+            _positionID
+        );
+        if (_position.data.length != 0) revert PositionAlreadyExists();
+
+        if (params.baseToken == address(0)) revert InvalidToken();
+        if (params.farmingToken == address(0)) revert InvalidToken();
+
+        if (!_validateAgent(_caller, _userFund)) revert NotAuthorized();
+    }
+
+    function _swapAndMint(
+        StrategyAddBaseTokenOnlyWithCalculateParam memory params
+    )
+        internal
+        returns (
+            uint256 tokenID,
+            uint128 liquidity,
+            uint256 token0Amount,
+            uint256 token1Amount,
+            address token0Addr,
+            address token1Addr
+        )
+    {
+        uint256 swapAmount;
+        (swapAmount, token0Addr, token1Addr) = _calculateSwapAmount(
+            params.baseToken,
+            params.farmingToken,
+            params.fee,
+            params.tickLower,
+            params.tickUpper,
+            params.totalAmount
+        );
 
         SafeERC20.safeIncreaseAllowance(
             IERC20(params.baseToken),
@@ -181,85 +308,17 @@ contract UniswapV3StrategyAddBaseTokenOnly is
             mintParams.amount1Desired
         );
 
-        (uint256 tokenID, , , ) = INonfungiblePositionManager(positionManager)
-            .mint(mintParams);
-        
-        // There may be tokens left in this contract
-        // We should return them to the fund source
-        address refundAddr = _userFund
-            ? IUserVault(msg.sender).user()
-            : msg.sender;
-        SafeERC20.safeTransfer(
-            IERC20(params.baseToken),
-            refundAddr,
-            IERC20(params.baseToken).balanceOf(address(this))
-        );
-        SafeERC20.safeTransfer(
-            IERC20(params.farmingToken),
-            refundAddr,
-            IERC20(params.farmingToken).balanceOf(address(this))
-        );
-
-        emit PCSV3AddBaseTokenOnly(
-            tokenID,
-            params.baseToken,
-            params.farmingToken,
-            baseAmount,
-            farmingAmount
+        (tokenID, liquidity, token0Amount, token1Amount) = INonfungiblePositionManager(positionManager).mint(
+            mintParams
         );
 
         return (
-            uint8(PositionType.V3_LP),
-            abi.encode(
-                V3Position({
-                    tokenId: tokenID,
-                    token0: params.baseToken,
-                    token1: params.farmingToken,
-                    fee: params.fee
-                })
-            )
+            tokenID,
+            liquidity,
+            token0Amount,
+            token1Amount,
+            token0Addr,
+            token1Addr
         );
-    }
-
-    function onERC721Received(
-        address /* operator */,
-        address /* from */,
-        uint256 /* tokenId */,
-        bytes calldata /* data */
-    ) external pure override returns (bytes4) {
-        return this.onERC721Received.selector;
-    }
-
-    function _validateAgent(
-        address _caller,
-        bool _userFund,
-        address _token0,
-        address _token1,
-        uint24 _fee
-    ) internal view returns (bool) {
-        address _vault = msg.sender;
-        if (_caller == IUserVault(_vault).user()) {
-            return true;
-        }
-
-        if (_caller != IUserVault(_vault).agent()) {
-            return false;
-        }
-
-        // Agent should not use user fund or pool is not approved
-        if (_userFund || !_validatePool(_token0, _token1, _fee)) {
-            return false;
-        }
-
-        return true;
-    }
-
-    function _validatePool(
-        address _token0,
-        address _token1,
-        uint24 _fee
-    ) internal view returns (bool) {
-        bytes32 _poolKey = keccak256(abi.encodePacked(_token0, _token1, _fee));
-        return IUserVault(msg.sender).approvedAgentPools(_poolKey);
     }
 }

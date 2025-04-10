@@ -23,3 +23,6 @@ ignition/deployments/chain-31337
 out
 cache_forge
 
+artifacts
+build-info
+journal.jsonl

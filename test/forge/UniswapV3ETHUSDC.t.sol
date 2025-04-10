@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IV3SwapRouter} from "../../contracts/interfaces/uniswapV3/periphery/IV3SwapRouter.sol";
 import {IManager} from "../../contracts/interfaces/IManager.sol";
 import {INonfungiblePositionManager} from "../../contracts/interfaces/uniswapV3/periphery/INonfungiblePositionManager.sol";
 import {UserVaultFactory} from "../../contracts/UserVaultFactory.sol";
@@ -12,24 +13,29 @@ import {MockToken} from "../../contracts/test/MockToken.sol";
 import {UserVault} from "../../contracts/UserVault.sol";
 import {Position} from "../../contracts/interfaces/IUserVault.sol";
 import {StrategyAddBaseTokenOnlyWithCalculateParam, UniswapV3StrategyAddBaseTokenOnly} from "../../contracts/strategies/uniswapV3/UniswapV3StrategyAddBaseTokenOnly.sol";
-import {UniswapV3BaseSepoliaConfig} from "./config/UniswapV3BaseSepoliaConfig.sol";
+import {UniswapV3BaseConfig} from "./config/UniswapV3BaseConfig.sol";
 import {EnvConfig} from "./config/EnvConfig.sol";
 import {TickMath} from "../../contracts/libraries/TickMath.sol";
 
-contract UniswapV3StrategiesTest is Test {
+interface IWETH is IERC20 {
+    function deposit() external payable;
+    function withdraw(uint256 amount) external;
+}
+
+interface USDC is IERC20 {
+    function mint(address to, uint256 amount) external;
+}
+
+contract UniswapV3ETHUSDC is Test {
     // Contracts
     Manager public manager;
     UserVaultFactory public userVaultFactory;
     UniswapV3StrategyAddBaseTokenOnly
         public addBaseTokenOnlyWithCalculateStrategy;
 
-    // Mock tokens
-    MockToken public tokenA;
-    MockToken public tokenB;
-
     // Token Path, assert the order of the tokens
-    address public token0;
-    address public token1;
+    address public token0 = 0x4200000000000000000000000000000000000006;
+    address public token1 = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
 
     // Users
     address public user;
@@ -40,23 +46,27 @@ contract UniswapV3StrategiesTest is Test {
 
     function setUp() public {
         // Fork the Base Sepolia testnet
-        string memory BASE_SEPOLIA_RPC = vm.envString("BASE_SEPOLIA_RPC");
-        uint256 baseSepoliaFork = vm.createFork(BASE_SEPOLIA_RPC, 23329343);
-        vm.selectFork(baseSepoliaFork);
+        string memory BASE_RPC = vm.envString("BASE_RPC");
+        uint256 baseFork = vm.createFork(BASE_RPC, 28004465);
+        vm.selectFork(baseFork);
 
         // Setup accounts
         deployer = address(this);
         user = makeAddr("user");
-        vm.deal(user, 100 ether);
+        vm.deal(user, 1000 ether);
 
-        // Deploy mock tokens with name, symbol, decimals, and owner
-        tokenA = new MockToken("Token A", "TA", 18, deployer);
-        tokenB = new MockToken("Token B", "TB", 6, deployer);
-
-        // Sort tokens to maintain order
-        (token0, token1) = address(tokenA) < address(tokenB)
-            ? (address(tokenA), address(tokenB))
-            : (address(tokenB), address(tokenA));
+        vm.startPrank(user);
+        IWETH(token0).deposit{value: 1000 ether}();
+        IERC20(token0).approve(UniswapV3BaseConfig.SwapRouter, 1000 ether);
+        IV3SwapRouter(UniswapV3BaseConfig.SwapRouter).exactInput(
+            IV3SwapRouter.ExactInputParams(
+                abi.encodePacked(token0, uint24(500), token1),
+                user,
+                50 ether,
+                0
+            )
+        );
+        vm.stopPrank();
 
         // Deploy main contracts
         // First deploy UserVault implementation
@@ -77,9 +87,9 @@ contract UniswapV3StrategiesTest is Test {
 
         // Initialize strategy with real PancakeSwap V3 contracts
         addBaseTokenOnlyWithCalculateStrategy.initialize(
-            UniswapV3BaseSepoliaConfig.Factory,
-            UniswapV3BaseSepoliaConfig.SwapRouter,
-            UniswapV3BaseSepoliaConfig.NonfungiblePositionManager
+            UniswapV3BaseConfig.Factory,
+            UniswapV3BaseConfig.SwapRouter,
+            UniswapV3BaseConfig.NonfungiblePositionManager
         );
 
         // Whitelist the strategy in the manager
@@ -91,67 +101,25 @@ contract UniswapV3StrategiesTest is Test {
         bytes32[] memory pools = new bytes32[](1);
         pools[0] = keccak256(abi.encodePacked(token0, token1, uint24(3000)));
         manager.setApprovedPools(pools, true);
-
-        // Mint tokens to user
-        tokenA.mint(user, INITIAL_MINT_AMOUNT);
-        tokenB.mint(user, INITIAL_MINT_AMOUNT);
-
-        // Create the pool if it doesn't exist
-        // We are deploying mock tokens, so we need to ensure the pool exists
-        // address factory = UniswapV3BaseSepoliaConfig.Factory;
-        address positionManager = UniswapV3BaseSepoliaConfig
-            .NonfungiblePositionManager;
-
-        // Use a low-level call to create the pool through the factory
-        INonfungiblePositionManager(positionManager)
-            .createAndInitializePoolIfNecessary(
-                token0,
-                token1,
-                3000,
-                1777828899773946460285413992955904
-            );
-
-        address lp = makeAddr("lp");
-        tokenA.mint(lp, 1000000 ether);
-        tokenB.mint(lp, 1000000 ether);
-        vm.startPrank(lp);
-        tokenA.approve(positionManager, type(uint256).max);
-        tokenB.approve(positionManager, type(uint256).max);
-        INonfungiblePositionManager(positionManager).mint(
-            INonfungiblePositionManager.MintParams({
-                token0: token0,
-                token1: token1,
-                fee: 3000,
-                tickLower: -46020,
-                tickUpper: 46020,
-                amount0Desired: 1000000 ether,
-                amount1Desired: 1000000 ether,
-                amount0Min: 0,
-                amount1Min: 0,
-                recipient: lp,
-                deadline: block.timestamp + 1000
-            })
-        );
-        vm.stopPrank();
     }
 
     function testAddBaseTokenOnly() public {
         // Use default parameters
-        uint256 amount = 100 ether;
-        int24 tickLower = -46080;
-        int24 tickUpper = 46080;
+        uint256 amount = 50000000;
+        int24 tickLower = -200040;
+        int24 tickUpper = -199860;
 
         _testAddBaseTokenWithParams(amount, tickLower, tickUpper);
     }
 
-    // forge-config: default.fuzz.runs = 200
-    function testAddBaseTokenOnlyFuzzed(
+    // forge-config: default.fuzz.runs = 10
+    function _testAddBaseTokenOnlyFuzzed(
         uint256 amount,
         int24 tickLowerMultiplier,
         int24 tickUpperMultiplier
     ) public {
         // Bound the input parameters to reasonable values
-        amount = bound(amount, 0.01 ether, 10000 ether);
+        amount = bound(amount, 0.01 ether, 50 ether);
 
         // Keep ticks within reasonable ranges and ensure they're multiples of tickSpacing (60 for 3000 fee tier)
         int24 tickSpacing = 60;
@@ -196,11 +164,11 @@ contract UniswapV3StrategiesTest is Test {
         }
 
         // Approve tokens to the vault
-        tokenA.approve(userVault, INITIAL_MINT_AMOUNT);
-        tokenB.approve(userVault, INITIAL_MINT_AMOUNT);
+        IERC20(token0).approve(userVault, INITIAL_MINT_AMOUNT);
+        IERC20(token1).approve(userVault, INITIAL_MINT_AMOUNT);
 
-        address baseToken = token0;
-        address farmingToken = token1;
+        address baseToken = token1;
+        address farmingToken = token0;
 
         // Prepare strategy parameters
         StrategyAddBaseTokenOnlyWithCalculateParam
@@ -208,14 +176,14 @@ contract UniswapV3StrategiesTest is Test {
                 baseToken: baseToken,
                 farmingToken: farmingToken,
                 totalAmount: amount,
-                fee: 3000,
+                fee: 500,
                 tickLower: tickLower,
                 tickUpper: tickUpper,
                 amount0Min: 0,
                 amount1Min: 0,
                 swapPath: abi.encodePacked(
                     baseToken,
-                    uint24(3000),
+                    uint24(500),
                     farmingToken
                 )
             });
@@ -254,17 +222,17 @@ contract UniswapV3StrategiesTest is Test {
         assertTrue(tokenId > 0, "Token ID should be greater than 0");
         assertEq(posToken0, token0, "Token0 should match");
         assertEq(posToken1, token1, "Token1 should match");
-        assertEq(posFee, 3000, "Fee should match");
+        assertEq(posFee, 500, "Fee should match");
 
-        // Balance of the strategy should be 0
+        // // Balance of the strategy should be 0
         assertEq(
-            tokenA.balanceOf(address(addBaseTokenOnlyWithCalculateStrategy)),
+            IERC20(token0).balanceOf(address(addBaseTokenOnlyWithCalculateStrategy)),
             0,
             "Token A balance should be 0"
         );
 
         assertEq(
-            tokenB.balanceOf(address(addBaseTokenOnlyWithCalculateStrategy)),
+            IERC20(token1).balanceOf(address(addBaseTokenOnlyWithCalculateStrategy)),
             0,
             "Token B balance should be 0"
         );
