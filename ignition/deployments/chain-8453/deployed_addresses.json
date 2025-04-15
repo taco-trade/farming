@@ -14,6 +14,9 @@
   "StrategiesUniswapV3Module#StrategiesUniswapV3ABTProxyAdmin": "0x733b85D4CBA707d6C26A42fD75B85B6340f488e4",
   "StrategiesUniswapV3Module#StrategiesUniswapV3DecProxyAdmin": "0x7a94a5D37BAe31E874EDc236A466d50f9d425761",
   "StrategiesUniswapV3Module#StrategiesUniswapV3MintProxyAdmin": "0x7039ca9aF2562e2aDE405d5Ae5C45B9f2c7551A2",
-  "UpgradeStrategiesModule#ProxyAdmin": "0x733b85D4CBA707d6C26A42fD75B85B6340f488e4",
-  "UpgradeStrategiesModule#TransparentUpgradeableProxy": "0x8cf8e17167F65Ae082399f80eD69472d0Ac28031"
+  "UpgradeStrategiesModule#TransparentUpgradeableProxy": "0x8cf8e17167F65Ae082399f80eD69472d0Ac28031",
+  "StrategiesUniswapV3Module#UniswapV3ZapMint": "0x3069edC4e26E18A6d62072DEE33b63329a021e9A",
+  "StrategiesUniswapV3Module#StrategiesUniswapV3ZapMintProxy": "0x123c2De812846eAa7838A8DA249C5eb065765f57",
+  "StrategiesUniswapV3Module#StrategiesUniswapV3ZapMintProxyAdmin": "0x869Fc56c3E8f4CcC6C0ad95ABe71B2b91ef81299",
+  "UpgradeStrategiesModule#ProxyAdmin": "0x733b85D4CBA707d6C26A42fD75B85B6340f488e4"
 }
