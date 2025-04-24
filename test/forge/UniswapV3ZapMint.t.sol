@@ -12,11 +12,10 @@ import {Manager} from "../../contracts/Manager.sol";
 import {MockToken} from "../../contracts/test/MockToken.sol";
 import {UserVault} from "../../contracts/UserVault.sol";
 import {Position} from "../../contracts/interfaces/IUserVault.sol";
-import {StrategyAddBaseTokenOnlyWithCalculateParam, UniswapV3StrategyAddBaseTokenOnly} from "../../contracts/strategies/uniswapV3/UniswapV3StrategyAddBaseTokenOnly.sol";
+import {StrategyZapMintParam, UniswapV3ZapMint} from "../../contracts/strategies/uniswapV3/UniswapV3ZapMint.sol";
 import {UniswapV3BaseConfig} from "./config/UniswapV3BaseConfig.sol";
 import {EnvConfig} from "./config/EnvConfig.sol";
 import {TickMath} from "../../contracts/libraries/TickMath.sol";
-import {StrategyParams, UniswapV3AddLiquidity} from "../../contracts/strategies/uniswapV3/UniswapV3AddLiquidity.sol";
 
 interface IWETH is IERC20 {
     function deposit() external payable;
@@ -27,13 +26,12 @@ interface USDC is IERC20 {
     function mint(address to, uint256 amount) external;
 }
 
-contract UniswapV3ETHUSDC is Test {
+contract UniswapV3ZapMintTest is Test {
     // Contracts
     Manager public manager;
     UserVaultFactory public userVaultFactory;
-    UniswapV3StrategyAddBaseTokenOnly
-        public addBaseTokenOnlyWithCalculateStrategy;
-    UniswapV3AddLiquidity public addLiquidityStrategy;
+    UniswapV3ZapMint
+        public zapMintStrategy;
 
     // Token Path, assert the order of the tokens
     address public token0 = 0x4200000000000000000000000000000000000006;
@@ -85,25 +83,18 @@ contract UniswapV3ETHUSDC is Test {
         manager.initialize(deployer, address(userVaultFactory));
 
         // Deploy the strategy
-        addBaseTokenOnlyWithCalculateStrategy = new UniswapV3StrategyAddBaseTokenOnly();
-        addLiquidityStrategy = new UniswapV3AddLiquidity();
+        zapMintStrategy = new UniswapV3ZapMint();
 
         // Initialize strategy with real PancakeSwap V3 contracts
-        addBaseTokenOnlyWithCalculateStrategy.initialize(
+        zapMintStrategy.initialize(
             UniswapV3BaseConfig.Factory,
             UniswapV3BaseConfig.SwapRouter,
             UniswapV3BaseConfig.NonfungiblePositionManager
         );
-        addLiquidityStrategy.initialize(
-            UniswapV3BaseConfig.NonfungiblePositionManager,
-            UniswapV3BaseConfig.Factory,
-            UniswapV3BaseConfig.SwapRouter
-        );
 
         // Whitelist the strategy in the manager
-        address[] memory strategies = new address[](2);
-        strategies[0] = address(addBaseTokenOnlyWithCalculateStrategy);
-        strategies[1] = address(addLiquidityStrategy);
+        address[] memory strategies = new address[](1);
+        strategies[0] = address(zapMintStrategy);
         manager.setApprovedStrategies(strategies, true);
 
         // Whitelist the pool in the manager
@@ -119,34 +110,6 @@ contract UniswapV3ETHUSDC is Test {
         int24 tickUpper = -199860;
 
         _testAddBaseTokenWithParams(amount, tickLower, tickUpper);
-        _testAddLiquidity();
-    }
-
-    function _testAddLiquidity() public {
-        vm.startPrank(user);
-        address userVault = manager.userVaults(user);
-        // Prepare strategy parameters
-        StrategyParams memory params = StrategyParams({
-            userFund: true,
-            amount0Desired: 0,
-            amount1Desired: 51000000,
-            amount0Min: 0,
-            amount1Min: 0,
-            token0SwapPath: abi.encodePacked(token0, uint24(500), token1),
-            token1SwapPath: abi.encodePacked(token1, uint24(500), token0)
-        });
-
-        // Encode strategy parameters
-        bytes memory encodedParams = abi.encode(params);
-
-        // Call work function to execute the strategy
-        manager.work(
-            userVault,
-            1,
-            address(addLiquidityStrategy),
-            encodedParams
-        );
-        vm.stopPrank();
     }
 
     // forge-config: default.fuzz.runs = 10
@@ -160,23 +123,21 @@ contract UniswapV3ETHUSDC is Test {
 
         // Keep ticks within reasonable ranges and ensure they're multiples of tickSpacing (60 for 3000 fee tier)
         int24 tickSpacing = 60;
-        int24 minTick = -887220; // Min tick for Uniswap V3
-        int24 maxTick = 887220; // Max tick for Uniswap V3
+        int24 minTick = -887220;  // Min tick for Uniswap V3
+        int24 maxTick = 887220;   // Max tick for Uniswap V3
 
         // Bound multipliers to create valid tick ranges
         tickLowerMultiplier = int24(bound(int24(tickLowerMultiplier), 1, 7000));
         tickUpperMultiplier = int24(bound(int24(tickUpperMultiplier), 1, 7000));
 
         // Calculate ticks ensuring they're multiples of tickSpacing
-        int24 tickLower = (minTick / tickSpacing + tickLowerMultiplier) *
-            tickSpacing;
-        int24 tickUpper = (maxTick / tickSpacing - tickUpperMultiplier) *
-            tickSpacing;
+        int24 tickLower = (minTick / tickSpacing + tickLowerMultiplier) * tickSpacing;
+        int24 tickUpper = (maxTick / tickSpacing - tickUpperMultiplier) * tickSpacing;
 
         // Ensure tickLower < tickUpper
         if (tickLower >= tickUpper) {
             int24 temp = tickLower;
-            tickLower = tickUpper - tickSpacing * 10; // Ensure at least some gap
+            tickLower = tickUpper - tickSpacing * 10;  // Ensure at least some gap
             tickUpper = temp + tickSpacing * 10;
         }
 
@@ -206,21 +167,29 @@ contract UniswapV3ETHUSDC is Test {
         IERC20(token0).approve(userVault, INITIAL_MINT_AMOUNT);
         IERC20(token1).approve(userVault, INITIAL_MINT_AMOUNT);
 
-        address baseToken = token1;
-        address farmingToken = token0;
-
         // Prepare strategy parameters
-        StrategyAddBaseTokenOnlyWithCalculateParam
-            memory params = StrategyAddBaseTokenOnlyWithCalculateParam({
-                baseToken: baseToken,
-                farmingToken: farmingToken,
-                totalAmount: amount,
+        StrategyZapMintParam
+            memory params = StrategyZapMintParam({
+                token0: token0,
+                token1: token1,
+                amount0: amount,
+                amount1: amount,
                 fee: 500,
                 tickLower: tickLower,
                 tickUpper: tickUpper,
                 amount0Min: 0,
                 amount1Min: 0,
-                swapPath: abi.encodePacked(baseToken, uint24(500), farmingToken)
+                token0SwapPath: abi.encodePacked(
+                    token0,
+                    uint24(500),
+                    token1
+                ),
+                token1SwapPath: abi.encodePacked(
+                    token1,
+                    uint24(500),
+                    token0
+                ),
+                userFund: true
             });
 
         // Encode strategy parameters
@@ -230,7 +199,7 @@ contract UniswapV3ETHUSDC is Test {
         manager.work(
             userVault,
             0,
-            address(addBaseTokenOnlyWithCalculateStrategy),
+            address(zapMintStrategy),
             encodedParams
         );
 
@@ -261,17 +230,13 @@ contract UniswapV3ETHUSDC is Test {
 
         // // Balance of the strategy should be 0
         assertEq(
-            IERC20(token0).balanceOf(
-                address(addBaseTokenOnlyWithCalculateStrategy)
-            ),
+            IERC20(token0).balanceOf(address(zapMintStrategy)),
             0,
             "Token A balance should be 0"
         );
 
         assertEq(
-            IERC20(token1).balanceOf(
-                address(addBaseTokenOnlyWithCalculateStrategy)
-            ),
+            IERC20(token1).balanceOf(address(zapMintStrategy)),
             0,
             "Token B balance should be 0"
         );
