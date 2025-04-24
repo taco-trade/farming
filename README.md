@@ -1,4 +1,4 @@
-# XAlpaca Ignition Modules
+# Farming Ignition Modules
 
 This repository contains Hardhat Ignition modules for deploying and managing smart contracts.
 
