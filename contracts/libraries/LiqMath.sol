@@ -11,6 +11,7 @@ import {FullMath} from "./FullMath.sol";
 library LiqMath {
     uint256 internal constant X96 = 1 << 96;
     uint256 internal constant X192 = 1 << 192;
+    uint256 internal constant DENOMINATOR = 1_000_000;
 
     /// @notice Calculates the amount of token0 that should be swapped
     /// @param sqrtPriceX96 Current sqrt price in X96 format
@@ -90,6 +91,7 @@ library LiqMath {
     /// @param sqrtPriceUpperX96 Upper bound sqrt price in X96 format
     /// @param token0Amount Amount of token0 input
     /// @param token1Amount Amount of token1 input
+    /// @param tolNum Tolerance number, 0.1% = 1000, 1% = 10000
     /// @return isToken0 true if token0 is the input token, false if token1 is the input token
     /// @return swapAmount Amount of token0 or token1 that should be swapped
     function getSwapAmount(
@@ -97,9 +99,10 @@ library LiqMath {
         uint160 sqrtPriceLowerX96,
         uint160 sqrtPriceUpperX96,
         uint256 token0Amount,
-        uint256 token1Amount
+        uint256 token1Amount,
+        uint256 tolNum
     ) internal pure returns (bool isToken0, uint256 swapAmount) {
-        // If current price is below or equal to lower bound, swap token1
+                // If current price is below or equal to lower bound, swap token1
         if (sqrtPriceX96 <= sqrtPriceLowerX96) {
             swapAmount = token1Amount;
             return (false, swapAmount);
@@ -127,8 +130,8 @@ library LiqMath {
 
         uint256 currRatio = (token1Amount * X96) / token0Amount;
         
-        // Check if ratios are close enough within 0.1% tolerance
-        uint256 tolerance = ratio * 5 / 1000; // 0.1% tolerance
+        // Check if ratios are close enough within tolerance
+        uint256 tolerance = ratio * tolNum / DENOMINATOR;
         if (currRatio > ratio - tolerance && currRatio < ratio + tolerance) {
             return (false, 0);
         }
@@ -146,6 +149,25 @@ library LiqMath {
                 (priceX96 + ratio);
             return (false, swapAmount);
         }
+    }
+
+    /// @notice Calculates the amount of token0 or token1 that should be swapped,
+    /// depending on the current price and the price range.
+    /// @param sqrtPriceX96 Current sqrt price in X96 format
+    /// @param sqrtPriceLowerX96 Lower bound sqrt price in X96 format
+    /// @param sqrtPriceUpperX96 Upper bound sqrt price in X96 format
+    /// @param token0Amount Amount of token0 input
+    /// @param token1Amount Amount of token1 input
+    /// @return isToken0 true if token0 is the input token, false if token1 is the input token
+    /// @return swapAmount Amount of token0 or token1 that should be swapped
+    function getSwapAmount(
+        uint160 sqrtPriceX96,
+        uint160 sqrtPriceLowerX96,
+        uint160 sqrtPriceUpperX96,
+        uint256 token0Amount,
+        uint256 token1Amount
+    ) internal pure returns (bool isToken0, uint256 swapAmount) {
+        return getSwapAmount(sqrtPriceX96, sqrtPriceLowerX96, sqrtPriceUpperX96, token0Amount, token1Amount, 5000);
     }
 
     /// @notice Calculates the ratio between token1 and token0 amounts for a given price range

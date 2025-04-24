@@ -15,7 +15,15 @@ const ETH_SCAN_API_KEY = vars.get("ETH_SCAN_API_KEY");
 const BASE_RPC = vars.get("BASE_RPC");
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.28",
+  solidity: {
+    version: "0.8.28",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 1000,
+      },
+    },
+  },
   networks: {
     hardhat: {
       forking: {
