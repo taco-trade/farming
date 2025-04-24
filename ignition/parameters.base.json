@@ -1,0 +1,9 @@
+{
+    "$global": {
+        "positionManager": "0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1",
+        "factory": "0x33128a8fC17869897dcE68Ed026d694621f6FDfD",
+        "router": "0x2626664c2603336E57B271c5C0b26F421741e481",
+
+        "ManagerAddr": "0x808e5bE958Ea75f9248CC2a60b03887B52b3D71A"
+    }
+}
