@@ -2,20 +2,14 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IV3SwapRouter} from "../../contracts/interfaces/uniswapV3/periphery/IV3SwapRouter.sol";
-import {IManager} from "../../contracts/interfaces/IManager.sol";
-import {INonfungiblePositionManager} from "../../contracts/interfaces/uniswapV3/periphery/INonfungiblePositionManager.sol";
 import {UserVaultFactory} from "../../contracts/UserVaultFactory.sol";
 import {Manager} from "../../contracts/Manager.sol";
-import {MockToken} from "../../contracts/test/MockToken.sol";
 import {UserVault} from "../../contracts/UserVault.sol";
 import {Position} from "../../contracts/interfaces/IUserVault.sol";
 import {StrategyZapMintParam, UniswapV3ZapMint} from "../../contracts/strategies/uniswapV3/UniswapV3ZapMint.sol";
 import {UniswapV3BaseConfig} from "./config/UniswapV3BaseConfig.sol";
-import {EnvConfig} from "./config/EnvConfig.sol";
-import {TickMath} from "../../contracts/libraries/TickMath.sol";
 
 interface IWETH is IERC20 {
     function deposit() external payable;
@@ -47,7 +41,7 @@ contract UniswapV3ZapMintTest is Test {
     function setUp() public {
         // Fork the Base Sepolia testnet
         string memory BASE_RPC = vm.envString("BASE_RPC");
-        uint256 baseFork = vm.createFork(BASE_RPC, 28004465);
+        uint256 baseFork = vm.createFork(BASE_RPC, 31373949);
         vm.selectFork(baseFork);
 
         // Setup accounts
@@ -106,8 +100,8 @@ contract UniswapV3ZapMintTest is Test {
     function testAddBaseTokenOnly() public {
         // Use default parameters
         uint256 amount = 50000000;
-        int24 tickLower = -200040;
-        int24 tickUpper = -199860;
+        int24 tickLower = -197860;
+        int24 tickUpper = -196860;
 
         _testAddBaseTokenWithParams(amount, tickLower, tickUpper);
     }
@@ -193,7 +187,7 @@ contract UniswapV3ZapMintTest is Test {
             });
 
         // Encode strategy parameters
-        bytes memory encodedParams = abi.encode(true, params);
+        bytes memory encodedParams = abi.encode(params);
 
         // Call work function to execute the strategy
         manager.work(

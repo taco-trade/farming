@@ -22,10 +22,10 @@ async function main() {
   console.log("userVault:", userVault);
 
   const decreaseLiquidityParams = {
-    liquidity: "1000000000000",
+    liquidity: "337551732430",
     amount0Min: 0,
     amount1Min: 0,
-    recipient: 0,
+    recipient: 0, // 0: user, 1: vault
   };
 
   const encodedParams = hre.ethers.AbiCoder.defaultAbiCoder().encode(
@@ -35,7 +35,7 @@ async function main() {
     [decreaseLiquidityParams]
   );
 
-  const workTx = await manager.work(userVault, 3, strategyAddr, encodedParams);
+  const workTx = await manager.work(userVault, 2, strategyAddr, encodedParams);
   console.log("work:", workTx.hash);
   await workTx.wait();
 }

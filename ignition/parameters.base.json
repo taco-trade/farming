@@ -4,6 +4,9 @@
         "factory": "0x33128a8fC17869897dcE68Ed026d694621f6FDfD",
         "router": "0x2626664c2603336E57B271c5C0b26F421741e481",
 
-        "ManagerAddr": "0x808e5bE958Ea75f9248CC2a60b03887B52b3D71A"
+        "ManagerAddr": "0x808e5bE958Ea75f9248CC2a60b03887B52b3D71A",
+        "ManagerProxy": "0x808e5bE958Ea75f9248CC2a60b03887B52b3D71A",
+        "ManagerProxyAdmin": "0xd8Ab45d9348b25908E0d68658dB5ec871f999793",
+        "UserVaultFactory": "0xf938078B1900BF50D8E0c86d5C19c6f3Ed989B8d"
     }
 }

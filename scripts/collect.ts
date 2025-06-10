@@ -10,7 +10,9 @@ async function main() {
   const [deployer] = await hre.ethers.getSigners();
   const chainId = hre.network.config.chainId!;
   const managerAddr = getDeployedAddressByModule(ManagerModule, "Manager", chainId)
-  const strategyAddr = getDeployedAddressByModule(StrategyModule, "StrategiesUniswapV3ABTProxy", chainId)
+  const strategyAddr = getDeployedAddressByModule(StrategyModule, "StrategiesUniswapV3CollectProxy", chainId)
+  console.log("managerAddr:", managerAddr);
+  console.log("strategyAddr:", strategyAddr);
   const manager = Manager__factory.connect(managerAddr, deployer);
 
   // Init user vault
@@ -20,36 +22,19 @@ async function main() {
     console.log("createUserVault:", tx.hash);
     await tx.wait();
   }
+
   userVault = await manager.userVaults(deployer.address);
   console.log("userVault:", userVault);
 
-  const t0Addr = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" // USDC
-  const t1Addr = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2" // WETH
-
-  // Add liquidity
-  const strategyParams = {
-    baseToken: t0Addr,
-    farmingToken: t1Addr,
-    totalAmount: 1120000,
-    fee: 500,
-    tickLower: 196740,          // Lower price bound for position
-    tickUpper: 198070,          // Upper price bound for position
-    amount0Min: 0,
-    amount1Min: 0,
-    swapPath: ethers.solidityPacked(
-      ["address", "uint24", "address"],
-      [t0Addr, 500, t1Addr]),
-  };
   // Encode strategy params
   const encodedParams = hre.ethers.AbiCoder.defaultAbiCoder().encode(
     [
-      'bool', // use user funds or vault funds
-      'tuple(address baseToken, address farmingToken, uint256 totalAmount, uint24 fee, int24 tickLower, int24 tickUpper, uint256 amount0Min, uint256 amount1Min, bytes swapPath)'
+      'bool'
     ],
-    [true, strategyParams]
+    [false]
   );
 
-  const workTx = await manager.work(userVault, 0, strategyAddr, encodedParams, { gasLimit: 1000000});
+  const workTx = await manager.work(userVault, 7, strategyAddr, encodedParams);
   console.log("work:", workTx.hash);
   await workTx.wait();
 }

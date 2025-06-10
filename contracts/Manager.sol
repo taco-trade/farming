@@ -117,12 +117,19 @@ contract Manager is IManager, OwnableUpgradeable, ReentrancyGuardUpgradeable {
         UserVault(vaultAddr).setApprovedAgentPools(_poolKeys, _allowed);
     }
 
-    /// @notice Collect tokens in this contract
+    /// @notice Collect tokens in the user's vault
     function collect(address token, address recipient) external nonReentrant {
         address vaultAddr = userVaults[msg.sender];
         if (vaultAddr == address(0)) revert NoVault();
         UserVault(vaultAddr).collect(token, recipient);
         emit Collect(msg.sender, token, recipient);
+    }
+
+    /// @notice Collect tokens in batch
+    function collectInBatch(address[] calldata tokens, address recipient) external nonReentrant {
+        address vaultAddr = userVaults[msg.sender];
+        if (vaultAddr == address(0)) revert NoVault();
+        UserVault(vaultAddr).collectInBatch(tokens, recipient);
     }
 
     /// @dev Internal function to create a UserVault for a user

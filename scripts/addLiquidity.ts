@@ -10,7 +10,9 @@ async function main() {
   const [deployer] = await hre.ethers.getSigners();
   const chainId = hre.network.config.chainId!;
   const managerAddr = getDeployedAddressByModule(ManagerModule, "Manager", chainId)
-  const strategyAddr = getDeployedAddressByModule(StrategyModule, "StrategiesUniswapV3ABTProxy", chainId)
+  const strategyAddr = getDeployedAddressByModule(StrategyModule, "StrategiesUniswapV3AddLiquidityProxy", chainId)
+  console.log("managerAddr:", managerAddr);
+  console.log("strategyAddr:", strategyAddr);
   const manager = Manager__factory.connect(managerAddr, deployer);
 
   // Init user vault
@@ -26,30 +28,35 @@ async function main() {
   const t0Addr = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" // USDC
   const t1Addr = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2" // WETH
 
+  //  const token0 = MockToken__factory.connect(t0Addr, deployer);
+  //  const token1 = MockToken__factory.connect(t1Addr, deployer);  
+  //  const tx0 = await token0.approve(userVault, ethers.parseEther("0.001"));
+  //  console.log("approve token0:", tx0.hash);
+  //  await tx0.wait();
+
   // Add liquidity
   const strategyParams = {
-    baseToken: t0Addr,
-    farmingToken: t1Addr,
-    totalAmount: 1120000,
-    fee: 500,
-    tickLower: 196740,          // Lower price bound for position
-    tickUpper: 198070,          // Upper price bound for position
-    amount0Min: 0,
-    amount1Min: 0,
-    swapPath: ethers.solidityPacked(
+    amount0Desired: 2000000,
+    amount1Desired: 0,
+    amount0Min: ethers.parseEther("0"),
+    amount1Min: ethers.parseEther("0"),
+    userFund: true,
+    token0SwapPath: ethers.solidityPacked(
       ["address", "uint24", "address"],
       [t0Addr, 500, t1Addr]),
+    token1SwapPath: ethers.solidityPacked(
+      ["address", "uint24", "address"],
+      [t1Addr, 500, t0Addr]),
   };
   // Encode strategy params
   const encodedParams = hre.ethers.AbiCoder.defaultAbiCoder().encode(
     [
-      'bool', // use user funds or vault funds
-      'tuple(address baseToken, address farmingToken, uint256 totalAmount, uint24 fee, int24 tickLower, int24 tickUpper, uint256 amount0Min, uint256 amount1Min, bytes swapPath)'
+      'tuple(uint256 amount0Desired, uint256 amount1Desired, uint256 amount0Min, uint256 amount1Min, bool userFund, bytes token0SwapPath, bytes token1SwapPath)'
     ],
-    [true, strategyParams]
+    [strategyParams]
   );
 
-  const workTx = await manager.work(userVault, 0, strategyAddr, encodedParams, { gasLimit: 1000000});
+  const workTx = await manager.work(userVault, 1, strategyAddr, encodedParams, { gasLimit: 1000000});
   console.log("work:", workTx.hash);
   await workTx.wait();
 }

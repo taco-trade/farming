@@ -26,8 +26,8 @@ async function main() {
   console.log("userVault:", userVault);
 
   // Token addresses for the Uniswap V3 position
-  const t0Addr = "0x4200000000000000000000000000000000000006" // WETH
-  const t1Addr = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" // USDC
+  const t0Addr = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" // USDC
+  const t1Addr = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2" // WETH
 
   // Step 2: Approve tokens for vault to spend
   const token0 = MockToken__factory.connect(t0Addr, deployer);
@@ -42,11 +42,11 @@ async function main() {
   const strategyParams = {
     token0: t0Addr,              // Token0 in the pool
     token1: t1Addr,              // Token1 in the pool
-    amount0: ethers.parseEther("0.0005"), // token0 amount
-    amount1: "2633838",          // token1 amount
+    amount0: ethers.parseEther("0"), // token0 amount
+    amount1: ethers.parseEther("0.001"),          // token1 amount
     fee: 500,                    // pool fee tier
-    tickLower: -203370,          // Lower price bound for position
-    tickUpper: -200320,          // Upper price bound for position
+    tickLower: 196740,          // Lower price bound for position
+    tickUpper: 198070,          // Upper price bound for position
     amount0Min: 0,               // Minimum amount of token0 (slippage protection)
     amount1Min: 0,               // Minimum amount of token1 (slippage protection)
     token0SwapPath: ethers.solidityPacked(

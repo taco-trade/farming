@@ -39,7 +39,12 @@ contract UniswapV3AddLiquidity is
     event AddLiquidity(
         address indexed vault,
         uint256 indexed positionID,
-        uint256 indexed tokenID
+        uint256 indexed tokenID,
+        address token0,
+        address token1,
+        uint128 liquidity,
+        uint256 token0Amount,
+        uint256 token1Amount
     );
         
 
@@ -109,12 +114,12 @@ contract UniswapV3AddLiquidity is
                     amount1Min: _params.amount1Min,
                     deadline: block.timestamp
                 });
-        INonfungiblePositionManager(positionManager)
+        (uint128 _liquidity, uint256 _amount0, uint256 _amount1) = INonfungiblePositionManager(positionManager)
             .increaseLiquidity(_decParams);
 
         _refundTokens(_v3Position.token0, _v3Position.token1, _params.userFund);
 
-        emit AddLiquidity(msg.sender, _positionID, _v3Position.tokenId);
+        emit AddLiquidity(msg.sender, _positionID, _v3Position.tokenId, _v3Position.token0, _v3Position.token1, _liquidity, _amount0, _amount1);
 
         _position.data = abi.encode(_v3Position);
         return (uint8(PositionType.V3_LP), _position.data);

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IManager} from "../../contracts/interfaces/IManager.sol";
 import {INonfungiblePositionManager} from "../../contracts/interfaces/uniswapV3/periphery/INonfungiblePositionManager.sol";
@@ -13,7 +12,6 @@ import {UserVault} from "../../contracts/UserVault.sol";
 import {Position} from "../../contracts/interfaces/IUserVault.sol";
 import {StrategyAddBaseTokenOnlyWithCalculateParam, UniswapV3StrategyAddBaseTokenOnly} from "../../contracts/strategies/uniswapV3/UniswapV3StrategyAddBaseTokenOnly.sol";
 import {UniswapV3BaseSepoliaConfig} from "./config/UniswapV3BaseSepoliaConfig.sol";
-import {EnvConfig} from "./config/EnvConfig.sol";
 import {TickMath} from "../../contracts/libraries/TickMath.sol";
 
 contract UniswapV3StrategiesTest is Test {
@@ -133,15 +131,6 @@ contract UniswapV3StrategiesTest is Test {
             })
         );
         vm.stopPrank();
-    }
-
-    function testAddBaseTokenOnly() public {
-        // Use default parameters
-        uint256 amount = 100 ether;
-        int24 tickLower = -46080;
-        int24 tickUpper = 46080;
-
-        _testAddBaseTokenWithParams(amount, tickLower, tickUpper);
     }
 
     // forge-config: default.fuzz.runs = 200

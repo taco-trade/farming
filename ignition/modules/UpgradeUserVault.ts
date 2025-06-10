@@ -3,8 +3,10 @@ import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 const UpgradeUserVaultModule = buildModule("UpgradeUserVaultModule", (m) => {
 //   const proxyAdminOwner = m.getAccount(0);
 
+  const userVaultFactoryAddr = m.getParameter("UserVaultFactory");
+
   // Get existing UserVaultFactory beacon
-  const existingUserVaultFactory = m.contractAt("UserVaultFactory", "0xf938078B1900BF50D8E0c86d5C19c6f3Ed989B8d");
+  const existingUserVaultFactory = m.contractAt("UserVaultFactory", userVaultFactoryAddr);
 
   // Deploy new UserVault implementation
   const newUserVaultImpl = m.contract("UserVault", [], { id: "UserVaultImpl01" });

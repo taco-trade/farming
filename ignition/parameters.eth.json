@@ -1,0 +1,12 @@
+{
+    "$global": {
+        "positionManager": "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
+        "factory": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+        "router": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+
+        "ManagerAddr": "0x1ee5546f4BbCB5753cE0639cF6ECC8EB27E69687",
+        "ManagerProxy": "0x1ee5546f4BbCB5753cE0639cF6ECC8EB27E69687",
+        "ManagerProxyAdmin": "0x3c9Ce01Da4548D546A69C6E13ef048B4F3B2d26a",
+        "UserVaultFactory": "0x1AF90f7AC5E2cE6387E379744bD13bce3cC703D8"
+    }
+}

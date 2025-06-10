@@ -34,4 +34,6 @@ interface IManager {
     function setAgent(address newAgent) external;
 
     function collect(address token, address recipient) external;
+
+    function collectInBatch(address[] calldata tokens, address recipient) external;
 }

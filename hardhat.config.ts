@@ -7,6 +7,7 @@ import "@typechain/hardhat";
 const BSC_TESTNET_RPC = vars.get("BSC_TESTNET_RPC");
 const BASE_SEPOLIA_RPC = vars.get("BASE_SEPOLIA_RPC");
 const SEPOLIA_RPC = vars.get("SEPOLIA_RPC");
+const ETH_RPC = vars.get("ETH_RPC");
 const PRIVATE_KEY = vars.get("PRIVATE_KEY");
 const PROD_PRIVATE_KEY = vars.get("PROD_PRIVATE_KEY");
 const BSC_SCAN_API_KEY = vars.get("BSC_SCAN_API_KEY");
@@ -36,6 +37,11 @@ const config: HardhatUserConfig = {
       chainId: 8453,
       accounts: [PROD_PRIVATE_KEY],
     },
+    ethereum: {
+      url: ETH_RPC,
+      chainId: 1,
+      accounts: [PROD_PRIVATE_KEY],
+    },
     bscTestnet: {
       url: BSC_TESTNET_RPC,
       chainId: 97,
@@ -54,6 +60,8 @@ const config: HardhatUserConfig = {
   },
   etherscan: {
     apiKey: {
+      mainnet: ETH_SCAN_API_KEY,
+      ethereum: ETH_SCAN_API_KEY,
       bscTestnet: BSC_SCAN_API_KEY,
       baseSepolia: BASE_SCAN_API_KEY,
       sepolia: ETH_SCAN_API_KEY,

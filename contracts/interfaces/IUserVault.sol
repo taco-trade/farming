@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "./IStrategy.sol";
-import "./pancakeswapV3/periphery/INonfungiblePositionManager.sol";
+import "./uniswapV3/periphery/INonfungiblePositionManager.sol";
 
 struct Position {
     // position NFT token ID
@@ -41,6 +41,9 @@ interface IUserVault is IERC721Receiver {
 
     /// @notice Collect tokens in this contract
     function collect(address _token, address _recipient) external;
+
+    /// @notice Collect tokens in batch
+    function collectInBatch(address[] calldata _tokens, address _recipient) external;
 
     function requestFundsFromUser(address _token, uint256 _amount) external;
 

@@ -14,6 +14,8 @@ const StrategiesUniswapV3Module = buildModule("StrategiesUniswapV3Module", (m) =
     const addBaseTokenOnlyStrategy = m.contract("UniswapV3StrategyAddBaseTokenOnly")
     const decreaseLiquidityStrategy = m.contract("UniswapV3DecreaseLiquidity")
     const zapMintStrategy = m.contract("UniswapV3ZapMint")
+    const addLiquidityStrategy = m.contract("UniswapV3AddLiquidity")
+    const collectStrategy = m.contract("UniswapV3Collect")
 
     // Get the parameters
     const positionManager = m.getParameter("positionManager");
@@ -25,6 +27,8 @@ const StrategiesUniswapV3Module = buildModule("StrategiesUniswapV3Module", (m) =
     const addBaseTokenOnlyInit = m.encodeFunctionCall(addBaseTokenOnlyStrategy, "initialize", [factory, router, positionManager]);
     const decreaseLiquidityInit = m.encodeFunctionCall(decreaseLiquidityStrategy, "initialize", [positionManager]);
     const zapMintInit = m.encodeFunctionCall(zapMintStrategy, "initialize", [factory, router, positionManager]);
+    const addLiquidityInit = m.encodeFunctionCall(addLiquidityStrategy, "initialize", [positionManager, factory, router]);
+    const collectInit = m.encodeFunctionCall(collectStrategy, "initialize", [positionManager]);
 
     // Deploy the mint strategy
     const mintProxy = m.contract("TransparentUpgradeableProxy", [mintStrategy, proxyAdminOwner, mintInit], { id: "StrategiesUniswapV3MintProxy" });
@@ -46,13 +50,31 @@ const StrategiesUniswapV3Module = buildModule("StrategiesUniswapV3Module", (m) =
     const zapMintProxyAdminAddress = m.readEventArgument(zapMintProxy, "AdminChanged", "newAdmin", { id: "StrategiesUniswapV3ZapMintAdmin" });
     const zapMintProxyAdmin = m.contractAt("ProxyAdmin", zapMintProxyAdminAddress, { id: "StrategiesUniswapV3ZapMintProxyAdmin" });
 
+    // Deploy the proxy for the add liquidity strategy
+    const addLiquidityProxy = m.contract("TransparentUpgradeableProxy", [addLiquidityStrategy, proxyAdminOwner, addLiquidityInit], { id: "StrategiesUniswapV3AddLiquidityProxy" });
+    const addLiquidityProxyAdminAddress = m.readEventArgument(addLiquidityProxy, "AdminChanged", "newAdmin", { id: "StrategiesUniswapV3AddLiquidityAdmin" });
+    const addLiquidityProxyAdmin = m.contractAt("ProxyAdmin", addLiquidityProxyAdminAddress, { id: "StrategiesUniswapV3AddLiquidityProxyAdmin" });
+
+    // Deploy the proxy for the collect strategy
+    const collectProxy = m.contract("TransparentUpgradeableProxy", [collectStrategy, proxyAdminOwner, collectInit], { id: "StrategiesUniswapV3CollectProxy" });
+    const collectProxyAdminAddress = m.readEventArgument(collectProxy, "AdminChanged", "newAdmin", { id: "StrategiesUniswapV3CollectAdmin" });
+    const collectProxyAdmin = m.contractAt("ProxyAdmin", collectProxyAdminAddress, { id: "StrategiesUniswapV3CollectProxyAdmin" });
+
     const { manager } = m.useModule(ManagerProxyModule);
     m.call(manager, "setApprovedStrategies", [
-        [mintProxy, addBaseTokenOnlyProxy, decreaseLiquidityProxy, zapMintProxy],
+        [mintProxy, addBaseTokenOnlyProxy, decreaseLiquidityProxy, zapMintProxy, addLiquidityProxy, collectProxy],
         true
     ])
+
     // Return the proxies and the corresponding proxy admins
-    return { mintProxy, mintProxyAdmin, addBaseTokenOnlyProxy, addBaseTokenOnlyProxyAdmin, decreaseLiquidityProxy, decreaseLiquidityProxyAdmin, zapMintProxy, zapMintProxyAdmin }
+    return {
+        mintProxy, mintProxyAdmin,
+        addBaseTokenOnlyProxy, addBaseTokenOnlyProxyAdmin,
+        decreaseLiquidityProxy, decreaseLiquidityProxyAdmin,
+        zapMintProxy, zapMintProxyAdmin,
+        addLiquidityProxy, addLiquidityProxyAdmin,
+        collectProxy, collectProxyAdmin
+    }
 });
 
 export default StrategiesUniswapV3Module;

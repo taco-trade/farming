@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 import "./interfaces/IStrategy.sol";
-import "./interfaces/pancakeswapV3/periphery/INonfungiblePositionManager.sol";
+import "./interfaces/uniswapV3/periphery/INonfungiblePositionManager.sol";
 import {Position, IUserVault} from "./interfaces/IUserVault.sol";
 
 contract UserVault is IUserVault, Initializable {
@@ -39,13 +39,6 @@ contract UserVault is IUserVault, Initializable {
     error NotUser();
     error NotInExec();
     error BadPositionID();
-    error NotOperator();
-
-    modifier onlyOperator() {
-        if (msg.sender != manager && msg.sender != user && msg.sender != _agent)
-            revert NotOperator();
-        _;
-    }
 
     modifier onlyManager() {
         if (msg.sender != manager && msg.sender != user) revert OnlyManager();
@@ -93,7 +86,7 @@ contract UserVault is IUserVault, Initializable {
         uint256 _positionID,
         address _strategy,
         bytes calldata _data
-    ) external onlyOperator {
+    ) external onlyManager {
         Position storage _pos;
         if (_positionID == 0) {
             _positionID = nextPositionId;
@@ -149,12 +142,22 @@ contract UserVault is IUserVault, Initializable {
     }
 
     /// @notice Collect tokens in this contract
-    function collect(address _token, address _recipient) external onlyOperator {
+    function collect(address _token, address _recipient) external onlyManager {
         SafeERC20.safeTransfer(
             IERC20(_token),
             _recipient,
             IERC20(_token).balanceOf(address(this))
         );
+    }
+
+    function collectInBatch(address[] calldata _tokens, address _recipient) external onlyManager {
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            SafeERC20.safeTransfer(
+                IERC20(_tokens[i]),
+                _recipient,
+                IERC20(_tokens[i]).balanceOf(address(this))
+            );
+        }
     }
 
     // ---------------- only strategy in exec scope can call functions ----------------- //
