@@ -3,15 +3,18 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import {INonfungiblePositionManager} from "../../interfaces/uniswapV3/periphery/INonfungiblePositionManager.sol";
 import {IStrategy} from "../../interfaces/IStrategy.sol";
 import {IUserVault, Position} from "../../interfaces/IUserVault.sol";
 
-contract UniswapV3Collect is IStrategy, OwnableUpgradeable {
+contract UniswapV3Collect is
+    IStrategy,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable
+{
     address public positionManager;
 
     event Collect(
@@ -30,7 +33,12 @@ contract UniswapV3Collect is IStrategy, OwnableUpgradeable {
         address _caller,
         uint256 _positionID,
         bytes calldata _data
-    ) external override returns (uint8 posType, bytes memory posData) {
+    ) 
+        external 
+        override 
+        nonReentrant 
+        returns (uint8 posType, bytes memory posData) 
+    {
         // Validate position and params
         Position memory _position = IUserVault(msg.sender).positions(
             _positionID

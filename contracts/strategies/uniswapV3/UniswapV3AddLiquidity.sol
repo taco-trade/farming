@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
@@ -18,8 +17,9 @@ import "../../interfaces/uniswapV3/core/IUniswapV3Pool.sol";
 struct StrategyParams {
     uint256 amount0Desired;
     uint256 amount1Desired;
-    uint256 amount0Min;
-    uint256 amount1Min;
+    uint256 sqrtPriceX96;
+    uint256 slippage; // 1_000_000 = 100%
+    uint256 priceSlippage; // 1_000_000 = 100%
     bool userFund;
     bytes token0SwapPath;
     bytes token1SwapPath;
@@ -35,6 +35,7 @@ contract UniswapV3AddLiquidity is
     address public router;
 
     error PositionNotExists();
+    error InvalidPriceSlippage();
 
     event AddLiquidity(
         address indexed vault,
@@ -93,16 +94,13 @@ contract UniswapV3AddLiquidity is
         (uint256 _t0Amount, uint256 _t1Amount) = _swapIfNeeded(
             _v3Position.token0,
             _v3Position.token1,
-            _params.amount0Desired,
-            _params.amount1Desired,
             _v3Position.fee,
             _v3Position.tokenId,
-            _params.token0SwapPath,
-            _params.token1SwapPath
+            _params
         );
 
-        IERC20(_v3Position.token0).approve(positionManager, _t0Amount);
-        IERC20(_v3Position.token1).approve(positionManager, _t1Amount);
+        SafeERC20.forceApprove(IERC20(_v3Position.token0), positionManager, _t0Amount);
+        SafeERC20.forceApprove(IERC20(_v3Position.token1), positionManager, _t1Amount);
 
         INonfungiblePositionManager.IncreaseLiquidityParams
             memory _decParams = INonfungiblePositionManager
@@ -110,8 +108,8 @@ contract UniswapV3AddLiquidity is
                     tokenId: _v3Position.tokenId,
                     amount0Desired: _t0Amount,
                     amount1Desired: _t1Amount,
-                    amount0Min: _params.amount0Min,
-                    amount1Min: _params.amount1Min,
+                    amount0Min: LiqMath.getMinAmount(_t0Amount, _params.slippage),
+                    amount1Min: LiqMath.getMinAmount(_t1Amount, _params.slippage),
                     deadline: block.timestamp
                 });
         (uint128 _liquidity, uint256 _amount0, uint256 _amount1) = INonfungiblePositionManager(positionManager)
@@ -152,26 +150,22 @@ contract UniswapV3AddLiquidity is
     function _swapIfNeeded(
         address _token0,
         address _token1,
-        uint256 _amount0,
-        uint256 _amount1,
         uint24 _fee,
         uint256 _tokenID,
-        bytes memory _token0SwapPath,
-        bytes memory _token1SwapPath
+        StrategyParams memory _params
     ) internal returns (uint256 _t0Amount, uint256 _t1Amount) {
         (bool _isToken0, uint256 _swapAmount) = _getSwapAmount(
             _token0,
             _token1,
-            _amount0,
-            _amount1,
             _fee,
-            _tokenID
+            _tokenID,
+            _params
         );
         if (_swapAmount > 0) {
             if (_isToken0) {
-                _swap(_token0, _swapAmount, _token0SwapPath);
+                _swap(_token0, _swapAmount, _params.token0SwapPath);
             } else {
-                _swap(_token1, _swapAmount, _token1SwapPath);
+                _swap(_token1, _swapAmount, _params.token1SwapPath);
             }
         }
         _t0Amount = IERC20(_token0).balanceOf(address(this));
@@ -181,10 +175,9 @@ contract UniswapV3AddLiquidity is
     function _getSwapAmount(
         address _token0,
         address _token1,
-        uint256 _amount0,
-        uint256 _amount1,
         uint24 _fee,
-        uint256 _tokenID
+        uint256 _tokenID,
+        StrategyParams memory _params
     ) internal view returns (bool _isToken0, uint256 _swapAmount) {
         // Get pool info
         address poolAddr = IUniswapV3Factory(factory).getPool(
@@ -196,6 +189,10 @@ contract UniswapV3AddLiquidity is
         (int24 _tickLower, int24 _tickUpper) = _getTickRange(_tokenID);
         // Get current price and tick bounds
         (uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(poolAddr).slot0();
+
+        // Validate price slippage
+        if (!LiqMath.validatePriceSlippage(_params.sqrtPriceX96, sqrtPriceX96, _params.priceSlippage)) revert InvalidPriceSlippage();
+
         uint160 sqrtPriceLowerX96 = TickMath.getSqrtRatioAtTick(_tickLower);
         uint160 sqrtPriceUpperX96 = TickMath.getSqrtRatioAtTick(_tickUpper);
 
@@ -204,8 +201,8 @@ contract UniswapV3AddLiquidity is
             sqrtPriceX96,
             sqrtPriceLowerX96,
             sqrtPriceUpperX96,
-            _amount0,
-            _amount1,
+            _params.amount0Desired,
+            _params.amount1Desired,
             10000 // 1% tolerance
         );
     }

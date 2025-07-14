@@ -14,6 +14,21 @@ import {StrategyAddBaseTokenOnlyWithCalculateParam, UniswapV3StrategyAddBaseToke
 import {UniswapV3BaseSepoliaConfig} from "./config/UniswapV3BaseSepoliaConfig.sol";
 import {TickMath} from "../../contracts/libraries/TickMath.sol";
 
+interface Pool {
+    function slot0()
+        external
+        view
+        returns (
+            uint160 sqrtPriceX96,
+            int24 tick,
+            uint16 observationIndex,
+            uint16 observationCardinality,
+            uint16 observationCardinalityNext,
+            uint8 feeProtocol,
+            bool unlocked
+        );
+}
+
 contract UniswapV3StrategiesTest is Test {
     // Contracts
     Manager public manager;
@@ -28,6 +43,7 @@ contract UniswapV3StrategiesTest is Test {
     // Token Path, assert the order of the tokens
     address public token0;
     address public token1;
+    address public pool;
 
     // Users
     address public user;
@@ -101,7 +117,7 @@ contract UniswapV3StrategiesTest is Test {
             .NonfungiblePositionManager;
 
         // Use a low-level call to create the pool through the factory
-        INonfungiblePositionManager(positionManager)
+        pool =INonfungiblePositionManager(positionManager)
             .createAndInitializePoolIfNecessary(
                 token0,
                 token1,
@@ -192,6 +208,7 @@ contract UniswapV3StrategiesTest is Test {
         address farmingToken = token1;
 
         // Prepare strategy parameters
+        (uint160 sqrtPriceX96, , , , , , ) = Pool(pool).slot0();
         StrategyAddBaseTokenOnlyWithCalculateParam
             memory params = StrategyAddBaseTokenOnlyWithCalculateParam({
                 baseToken: baseToken,
@@ -200,8 +217,9 @@ contract UniswapV3StrategiesTest is Test {
                 fee: 3000,
                 tickLower: tickLower,
                 tickUpper: tickUpper,
-                amount0Min: 0,
-                amount1Min: 0,
+                slippage: 90_0000,
+                priceSlippage: 10_000,
+                sqrtPriceX96: sqrtPriceX96,
                 swapPath: abi.encodePacked(
                     baseToken,
                     uint24(3000),

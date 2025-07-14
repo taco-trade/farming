@@ -3,7 +3,8 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+
 import {IStrategy} from "../../interfaces/IStrategy.sol";
 import {IUserVault, Position} from "../../interfaces/IUserVault.sol";
 import {IV3SwapRouter} from "../../interfaces/uniswapV3/periphery/IV3SwapRouter.sol";
@@ -21,14 +22,19 @@ struct StrategyZapMintParam {
     uint24 fee;
     int24 tickLower;
     int24 tickUpper;
-    uint256 amount0Min;
-    uint256 amount1Min;
+    uint256 sqrtPriceX96;
+    uint256 slippage; // 1_000_000 = 100%
+    uint256 priceSlippage; // 1_000_000 = 100%
     bytes token0SwapPath;
     bytes token1SwapPath;
     bool userFund;
 }
 
-contract UniswapV3ZapMint is IStrategy, IERC721Receiver, OwnableUpgradeable {
+contract UniswapV3ZapMint is 
+    IStrategy,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable
+{
     address public factory;
     address public router;
     address public positionManager;
@@ -36,6 +42,7 @@ contract UniswapV3ZapMint is IStrategy, IERC721Receiver, OwnableUpgradeable {
     error PositionAlreadyExists();
     error InvalidToken();
     error InvalidAmount();
+    error InvalidPriceSlippage();
 
     event Mint(
         address indexed vault,
@@ -60,20 +67,16 @@ contract UniswapV3ZapMint is IStrategy, IERC721Receiver, OwnableUpgradeable {
         positionManager = _positionManager;
     }
 
-    function onERC721Received(
-        address /* operator */,
-        address /* from */,
-        uint256 /* tokenId */,
-        bytes calldata /* data */
-    ) external pure override returns (bytes4) {
-        return this.onERC721Received.selector;
-    }
-
     function execute(
         address _caller,
         uint256 _positionID,
         bytes calldata data
-    ) external override returns (uint8 posType, bytes memory posData) {
+    ) 
+        external 
+        override 
+        nonReentrant 
+        returns (uint8 posType, bytes memory posData) 
+    {
         // Decode parameters
         StrategyZapMintParam memory params = abi.decode(
             data,
@@ -192,6 +195,54 @@ contract UniswapV3ZapMint is IStrategy, IERC721Receiver, OwnableUpgradeable {
             uint256 token1Amount
         )
     {
+        // Calculate and perform optimal swaps
+        _calculateAndPerformSwaps(params);
+
+        uint256 t0Amount = IERC20(params.token0).balanceOf(address(this));
+        uint256 t1Amount = IERC20(params.token1).balanceOf(address(this));
+
+        // Prepare mint parameters
+        INonfungiblePositionManager.MintParams
+            memory mintParams = INonfungiblePositionManager.MintParams(
+                params.token0,
+                params.token1,
+                params.fee,
+                params.tickLower,
+                params.tickUpper,
+                t0Amount,
+                t1Amount,
+                LiqMath.getMinAmount(t0Amount, params.slippage),
+                LiqMath.getMinAmount(t1Amount, params.slippage),
+                address(msg.sender),
+                block.timestamp
+            );
+
+        // Approve position manager to spend tokens
+        SafeERC20.forceApprove(
+            IERC20(params.token0),
+            positionManager,
+            mintParams.amount0Desired
+        );
+        SafeERC20.forceApprove(
+            IERC20(params.token1),
+            positionManager,
+            mintParams.amount1Desired
+        );
+
+        // Mint position
+        (
+            tokenID,
+            liquidity,
+            token0Amount,
+            token1Amount
+        ) = INonfungiblePositionManager(positionManager).mint(mintParams);
+
+        return (tokenID, liquidity, token0Amount, token1Amount);
+    }
+
+    function _calculateAndPerformSwaps(
+        StrategyZapMintParam memory params
+    ) internal {
         // Get pool info
         address poolAddr = IUniswapV3Factory(factory).getPool(
             params.token0,
@@ -201,6 +252,9 @@ contract UniswapV3ZapMint is IStrategy, IERC721Receiver, OwnableUpgradeable {
 
         // Get current price and tick bounds
         (uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(poolAddr).slot0();
+        // Validate price slippage
+        if (!LiqMath.validatePriceSlippage(params.sqrtPriceX96, sqrtPriceX96, params.priceSlippage)) revert InvalidPriceSlippage();
+
         uint160 sqrtPriceLowerX96 = TickMath.getSqrtRatioAtTick(
             params.tickLower
         );
@@ -225,44 +279,6 @@ contract UniswapV3ZapMint is IStrategy, IERC721Receiver, OwnableUpgradeable {
                 _swap(params.token1, swapAmount, params.token1SwapPath);
             }
         }
-
-        // Prepare mint parameters
-        INonfungiblePositionManager.MintParams
-            memory mintParams = INonfungiblePositionManager.MintParams(
-                params.token0,
-                params.token1,
-                params.fee,
-                params.tickLower,
-                params.tickUpper,
-                IERC20(params.token0).balanceOf(address(this)),
-                IERC20(params.token1).balanceOf(address(this)),
-                params.amount0Min,
-                params.amount1Min,
-                address(msg.sender),
-                block.timestamp
-            );
-
-        // Approve position manager to spend tokens
-        SafeERC20.safeIncreaseAllowance(
-            IERC20(params.token0),
-            positionManager,
-            mintParams.amount0Desired
-        );
-        SafeERC20.safeIncreaseAllowance(
-            IERC20(params.token1),
-            positionManager,
-            mintParams.amount1Desired
-        );
-
-        // Mint position
-        (
-            tokenID,
-            liquidity,
-            token0Amount,
-            token1Amount
-        ) = INonfungiblePositionManager(positionManager).mint(mintParams);
-
-        return (tokenID, liquidity, token0Amount, token1Amount);
     }
 
     function _swap(
@@ -270,7 +286,7 @@ contract UniswapV3ZapMint is IStrategy, IERC721Receiver, OwnableUpgradeable {
         uint256 _amount,
         bytes memory _swapPath
     ) internal {
-        SafeERC20.safeIncreaseAllowance(IERC20(_token), router, _amount);
+        SafeERC20.forceApprove(IERC20(_token), router, _amount);
         IV3SwapRouter(router).exactInput(
             IV3SwapRouter.ExactInputParams(_swapPath, address(this), _amount, 0)
         );

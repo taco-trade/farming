@@ -31,12 +31,12 @@ library LiqMath {
         require(sqrtPriceLowerX96 < sqrtPriceUpperX96, "Invalid price range");
         // If current price is below or equal to lower bound
         if (sqrtPriceX96 <= sqrtPriceLowerX96) {
-            swapAmount = totalAmount;
+            swapAmount = 0;
             return swapAmount;
         }
         // If current price is above or equal to upper bound
         if (sqrtPriceX96 >= sqrtPriceUpperX96) {
-            swapAmount = 0;
+            swapAmount = totalAmount;
             return swapAmount;
         }
 
@@ -45,7 +45,7 @@ library LiqMath {
             sqrtPriceLowerX96,
             sqrtPriceUpperX96
         );
-        uint256 priceX96 = FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, 1 << 96);
+        uint256 priceX96 = FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, X96);
         swapAmount = (totalAmount * ratio) / (priceX96 + ratio);
     }
 
@@ -67,12 +67,12 @@ library LiqMath {
         require(sqrtPriceLowerX96 < sqrtPriceUpperX96, "Invalid price range");
         // If current price is below or equal to lower bound
         if (sqrtPriceX96 <= sqrtPriceLowerX96) {
-            swapAmount = 0;
+            swapAmount = totalAmount;
             return swapAmount;
         }
         // If current price is above or equal to upper bound
         if (sqrtPriceX96 >= sqrtPriceUpperX96) {
-            swapAmount = totalAmount;
+            swapAmount = 0;
             return swapAmount;
         }
         uint256 ratio = _ratio(
@@ -80,8 +80,8 @@ library LiqMath {
             sqrtPriceLowerX96,
             sqrtPriceUpperX96
         );
-        uint256 priceX96 = FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, 1 << 96);
-        swapAmount = (totalAmount * priceX96) / (priceX96 + ratio);
+        uint256 priceX96 = FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, X96);
+        swapAmount = FullMath.mulDiv(totalAmount,priceX96, priceX96 + ratio);
     }
 
     /// @notice Calculates the amount of token0 or token1 that should be swapped,
@@ -122,9 +122,7 @@ library LiqMath {
         uint256 priceX96 = FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, X96);
 
         if (token0Amount == 0) {
-            swapAmount =
-                (token1Amount * priceX96 - ratio * token0Amount * priceX96 / X96) /
-                (priceX96 + ratio);
+            swapAmount = (token1Amount * priceX96) / (priceX96 + ratio);
             return (false, swapAmount);
         }
 
@@ -170,6 +168,29 @@ library LiqMath {
         return getSwapAmount(sqrtPriceX96, sqrtPriceLowerX96, sqrtPriceUpperX96, token0Amount, token1Amount, 5000);
     }
 
+    function validatePriceSlippage(
+        uint256 expectedSqrtPriceX96,
+        uint256 sqrtPriceX96,
+        uint256 priceSlippage
+    ) internal pure returns (bool) {
+        uint256 slippage;
+        if (expectedSqrtPriceX96 > sqrtPriceX96) {
+            slippage = FullMath.mulDiv(expectedSqrtPriceX96 - sqrtPriceX96, DENOMINATOR, expectedSqrtPriceX96);
+        } else {
+            slippage = FullMath.mulDiv(sqrtPriceX96 - expectedSqrtPriceX96, DENOMINATOR, expectedSqrtPriceX96);
+        }
+        // We need to square it to get the actual slippage
+        slippage = FullMath.mulDiv(slippage, slippage, DENOMINATOR) + 2 * slippage;
+        return slippage <= priceSlippage;
+    }
+
+    function getMinAmount(
+        uint256 amount,
+        uint256 slippage
+    ) internal pure returns (uint256) {
+        return FullMath.mulDiv(amount, DENOMINATOR - slippage, DENOMINATOR);
+    }
+
     /// @notice Calculates the ratio between token1 and token0 amounts for a given price range
     /// @param sqrtPriceX96 Current sqrt price in X96 format
     /// @param sqrtPriceLowerX96 Lower bound sqrt price in X96 format
@@ -183,6 +204,6 @@ library LiqMath {
         uint256 numerator = sqrtPriceX96 - sqrtPriceLowerX96;
         uint256 denominator = (X192 / sqrtPriceX96) -
             (X192 / sqrtPriceUpperX96);
-        ratio = (numerator * X96) / denominator;
+        ratio = FullMath.mulDiv(numerator, X96, denominator);
     }
 }

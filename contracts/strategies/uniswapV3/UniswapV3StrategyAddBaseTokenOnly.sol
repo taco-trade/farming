@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+
 import {IStrategy} from "../../interfaces/IStrategy.sol";
 import {IUserVault, Position} from "../../interfaces/IUserVault.sol";
 import {IV3SwapRouter} from "../../interfaces/uniswapV3/periphery/IV3SwapRouter.sol";
@@ -18,17 +18,17 @@ struct StrategyAddBaseTokenOnlyWithCalculateParam {
     address baseToken;
     address farmingToken;
     uint256 totalAmount;
+    uint256 sqrtPriceX96;
+    uint256 slippage; // 1_000_000 = 100%
+    uint256 priceSlippage; // 1_000_000 = 100%
     uint24 fee;
-    int24 tickLower; // price ?
-    int24 tickUpper; // price ?
-    uint256 amount0Min;
-    uint256 amount1Min;
+    int24 tickLower;
+    int24 tickUpper;
     bytes swapPath;
 }
 
 contract UniswapV3StrategyAddBaseTokenOnly is
     IStrategy,
-    IERC721Receiver,
     OwnableUpgradeable
 {
     address public factory;
@@ -37,6 +37,7 @@ contract UniswapV3StrategyAddBaseTokenOnly is
 
     error PositionAlreadyExists();
     error InvalidToken();
+    error InvalidPriceSlippage();
 
     event Mint(
         address indexed vault,
@@ -119,15 +120,6 @@ contract UniswapV3StrategyAddBaseTokenOnly is
         );
     }
 
-    function onERC721Received(
-        address /* operator */,
-        address /* from */,
-        uint256 /* tokenId */,
-        bytes calldata /* data */
-    ) external pure override returns (bytes4) {
-        return this.onERC721Received.selector;
-    }
-
     function _requestFunds(
         bool _userFund,
         address _baseToken,
@@ -190,7 +182,9 @@ contract UniswapV3StrategyAddBaseTokenOnly is
         uint24 fee,
         int24 tickLower,
         int24 tickUpper,
-        uint256 totalAmount
+        uint256 totalAmount,
+        uint256 expectedSqrtPriceX96,
+        uint256 priceSlippage
     )
         internal
         view
@@ -204,6 +198,10 @@ contract UniswapV3StrategyAddBaseTokenOnly is
 
         // token1/token0
         (uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(poolAddr).slot0();
+
+        // Validate price slippage
+        if (!LiqMath.validatePriceSlippage(expectedSqrtPriceX96, sqrtPriceX96, priceSlippage)) revert InvalidPriceSlippage();
+
         uint160 sqrtPriceLowerX96 = TickMath.getSqrtRatioAtTick(tickLower);
         uint160 sqrtPriceUpperX96 = TickMath.getSqrtRatioAtTick(tickUpper);
 
@@ -264,45 +262,43 @@ contract UniswapV3StrategyAddBaseTokenOnly is
             params.fee,
             params.tickLower,
             params.tickUpper,
-            params.totalAmount
+            params.totalAmount,
+            params.sqrtPriceX96,
+            params.priceSlippage
         );
 
-        SafeERC20.safeIncreaseAllowance(
-            IERC20(params.baseToken),
-            router,
-            swapAmount
-        );
         uint256 baseAmount = params.totalAmount - swapAmount;
-        uint256 farmingAmount = IV3SwapRouter(router).exactInput(
-            IV3SwapRouter.ExactInputParams(
-                params.swapPath,
-                address(this),
-                swapAmount,
-                0
-            )
+        uint256 farmingAmount = swapAmount;
+        if (swapAmount > 0) {
+            SafeERC20.forceApprove(
+                IERC20(params.baseToken),
+                router,
+                swapAmount
+            );
+            farmingAmount = IV3SwapRouter(router).exactInput(
+                IV3SwapRouter.ExactInputParams(
+                    params.swapPath,
+                    address(this),
+                    swapAmount,
+                    0
+                )
+            );
+        }
+
+        INonfungiblePositionManager.MintParams memory mintParams = _buildMintParams(
+            token0Addr,
+            token1Addr,
+            baseAmount,
+            farmingAmount,
+            params
         );
 
-        INonfungiblePositionManager.MintParams
-            memory mintParams = INonfungiblePositionManager.MintParams(
-                token0Addr,
-                token1Addr,
-                params.fee,
-                params.tickLower,
-                params.tickUpper,
-                params.baseToken == token0Addr ? baseAmount : farmingAmount,
-                params.baseToken == token0Addr ? farmingAmount : baseAmount,
-                params.amount0Min,
-                params.amount1Min,
-                address(msg.sender),
-                block.timestamp
-            );
-
-        SafeERC20.safeIncreaseAllowance(
+        SafeERC20.forceApprove(
             IERC20(mintParams.token0),
             positionManager,
             mintParams.amount0Desired
         );
-        SafeERC20.safeIncreaseAllowance(
+        SafeERC20.forceApprove(
             IERC20(mintParams.token1),
             positionManager,
             mintParams.amount1Desired
@@ -320,5 +316,45 @@ contract UniswapV3StrategyAddBaseTokenOnly is
             token0Addr,
             token1Addr
         );
+    }
+
+    function _buildMintParams(
+        address token0Addr,
+        address token1Addr,
+        uint256 baseAmount,
+        uint256 farmingAmount,
+        StrategyAddBaseTokenOnlyWithCalculateParam memory params
+    ) internal view returns (INonfungiblePositionManager.MintParams memory) {
+        uint256 t0Amount;
+        uint256 t1Amount;
+        uint256 t0Min;
+        uint256 t1Min;
+
+        if (params.baseToken == token0Addr) {
+            t0Amount = baseAmount;
+            t1Amount = farmingAmount;
+            t0Min = LiqMath.getMinAmount(t0Amount, params.slippage);
+            t1Min = LiqMath.getMinAmount(t1Amount, params.slippage);
+        } else {
+            t0Amount = farmingAmount;
+            t1Amount = baseAmount;
+            t0Min = LiqMath.getMinAmount(t0Amount, params.slippage);
+            t1Min = LiqMath.getMinAmount(t1Amount, params.slippage);
+        }
+
+        INonfungiblePositionManager.MintParams memory mintParams = INonfungiblePositionManager.MintParams(
+                token0Addr,
+                token1Addr,
+                params.fee,
+                params.tickLower,
+                params.tickUpper,
+                t0Amount,
+                t1Amount,
+                t0Min,
+                t1Min,
+                address(msg.sender),
+                block.timestamp
+            );
+        return mintParams;
     }
 }

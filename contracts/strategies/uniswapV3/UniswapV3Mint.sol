@@ -13,7 +13,6 @@ import {IUserVault, Position} from "../../interfaces/IUserVault.sol";
 
 contract UniswapV3Mint is
     IStrategy,
-    IERC721Receiver,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable
 {
@@ -67,12 +66,12 @@ contract UniswapV3Mint is
             revert NotAuthorized();
         }
 
-        SafeERC20.safeIncreaseAllowance(
+        SafeERC20.forceApprove(
             IERC20(_params.token0),
             positionManager,
             _params.amount0Desired
         );
-        SafeERC20.safeIncreaseAllowance(
+        SafeERC20.forceApprove(
             IERC20(_params.token1),
             positionManager,
             _params.amount1Desired
@@ -104,6 +103,8 @@ contract UniswapV3Mint is
         (uint256 _tokenID, uint128 _liquidity, uint256 _amount0, uint256 _amount1) = INonfungiblePositionManager(positionManager)
             .mint(_params);
 
+        _refundTokens(_params.token0, _params.token1, _userFund);
+
         emit Mint(
             msg.sender,
             _positionID,
@@ -125,15 +126,6 @@ contract UniswapV3Mint is
                 })
             )
         );
-    }
-
-    function onERC721Received(
-        address /* operator */,
-        address /* from */,
-        uint256 /* tokenId */,
-        bytes calldata /* data */
-    ) external pure override returns (bytes4) {
-        return this.onERC721Received.selector;
     }
 
     /// @notice Validate the agent behavior
@@ -158,5 +150,21 @@ contract UniswapV3Mint is
             return false;
         }
         return true;
+    }
+
+    function _refundTokens(address token0, address token1, bool userFund) internal {
+        address refundAddr = userFund
+            ? IUserVault(msg.sender).user()
+            : msg.sender;
+        SafeERC20.safeTransfer(
+            IERC20(token0),
+            refundAddr,
+            IERC20(token0).balanceOf(address(this))
+        );
+        SafeERC20.safeTransfer(
+            IERC20(token1),
+            refundAddr,
+            IERC20(token1).balanceOf(address(this))
+        );
     }
 }

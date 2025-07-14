@@ -139,13 +139,4 @@ contract Manager is IManager, OwnableUpgradeable, ReentrancyGuardUpgradeable {
         emit CreateUserVault(_user, address(_vault));
         return address(_vault);
     }
-
-    /// @dev Converts (token0, token1, fee) into a key
-    function _getPoolKey(
-        address token0,
-        address token1,
-        uint24 fee
-    ) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(token0, token1, fee));
-    }
 }

@@ -101,8 +101,8 @@ contract UserVault is IUserVault, Initializable {
         STRATEGY = _strategy;
         POSITION_ID = _positionID;
 
-        // If the agent or user calls this function directly,
-        // we need to set the caller to the agent or user manually.
+        // If the user calls this function directly,
+        // we need to set the caller to the user manually.
         if (msg.sender != manager) {
             _caller = msg.sender;
         }

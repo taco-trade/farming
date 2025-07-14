@@ -20,6 +20,21 @@ interface USDC is IERC20 {
     function mint(address to, uint256 amount) external;
 }
 
+interface Pool {
+    function slot0()
+        external
+        view
+        returns (
+            uint160 sqrtPriceX96,
+            int24 tick,
+            uint16 observationIndex,
+            uint16 observationCardinality,
+            uint16 observationCardinalityNext,
+            uint8 feeProtocol,
+            bool unlocked
+        );
+}
+
 contract UniswapV3ZapMintTest is Test {
     // Contracts
     Manager public manager;
@@ -30,6 +45,7 @@ contract UniswapV3ZapMintTest is Test {
     // Token Path, assert the order of the tokens
     address public token0 = 0x4200000000000000000000000000000000000006;
     address public token1 = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
+    address public pool = 0xd0b53D9277642d899DF5C87A3966A349A798F224;
 
     // Users
     address public user;
@@ -162,6 +178,7 @@ contract UniswapV3ZapMintTest is Test {
         IERC20(token1).approve(userVault, INITIAL_MINT_AMOUNT);
 
         // Prepare strategy parameters
+        (uint160 sqrtPriceX96, , , , , , ) = Pool(pool).slot0();
         StrategyZapMintParam
             memory params = StrategyZapMintParam({
                 token0: token0,
@@ -171,8 +188,6 @@ contract UniswapV3ZapMintTest is Test {
                 fee: 500,
                 tickLower: tickLower,
                 tickUpper: tickUpper,
-                amount0Min: 0,
-                amount1Min: 0,
                 token0SwapPath: abi.encodePacked(
                     token0,
                     uint24(500),
@@ -183,6 +198,9 @@ contract UniswapV3ZapMintTest is Test {
                     uint24(500),
                     token0
                 ),
+                sqrtPriceX96: sqrtPriceX96,
+                slippage: 10_000,
+                priceSlippage: 10_000,
                 userFund: true
             });
 

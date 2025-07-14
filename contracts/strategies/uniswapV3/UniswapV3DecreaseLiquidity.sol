@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import {INonfungiblePositionManager} from "../../interfaces/uniswapV3/periphery/INonfungiblePositionManager.sol";
 import {IStrategy} from "../../interfaces/IStrategy.sol";
@@ -23,7 +24,11 @@ struct StrategyParams {
     Receipient recipient;
 }
 
-contract UniswapV3DecreaseLiquidity is IStrategy, OwnableUpgradeable {
+contract UniswapV3DecreaseLiquidity is
+    IStrategy,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable
+{
     address public positionManager;
 
     event DecreaseLiquidity(
@@ -44,7 +49,12 @@ contract UniswapV3DecreaseLiquidity is IStrategy, OwnableUpgradeable {
         address _caller,
         uint256 _positionID,
         bytes calldata _data
-    ) external override returns (uint8 posType, bytes memory posData) {
+    ) 
+        external 
+        override 
+        nonReentrant 
+        returns (uint8 posType, bytes memory posData) 
+    {
         // Decode params
         StrategyParams memory _params = abi.decode(_data, (StrategyParams));
         Position memory _position = IUserVault(msg.sender).positions(
