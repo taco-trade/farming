@@ -37,6 +37,25 @@ pnpm run deploy:base:manager
 pnpm run deploy:base:strategies:uniswapv3
 ```
 
+### BNB Smart Chain (BSC)
+
+The project supports the BNB Chain ecosystem. A BSC testnet network (`bscTestnet`, chainId 97) is pre-configured in `hardhat.config.ts`, and the test suite runs against a local Hardhat node forked from BSC testnet.
+
+Required Hardhat configuration variables for BNB Smart Chain:
+- `BSC_TESTNET_RPC` - RPC endpoint of the BSC testnet
+- `BSC_SCAN_API_KEY` - BscScan API key for contract verification
+
+Deploy on BNB Smart Chain using the generic command pattern below (provide a network-specific parameters file as described in [Parameters](#parameters)):
+
+```shell
+# Deploy Manager with Proxy on BSC testnet
+pnpm exec hardhat ignition deploy ./ignition/modules/ManagerWithProxy.ts \
+  --network bscTestnet \
+  --parameters ignition/parameters.bscTestnet.json \
+  --verify \
+  --deployment-id manager-bsc-testnet-01
+```
+
 ## Shell Commands
 
 ### Deploy Modules
